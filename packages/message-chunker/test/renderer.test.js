@@ -136,9 +136,14 @@ describe('renderer-html — code blocks', () => {
         assert.equal(html, '<pre>code</pre>');
     });
 
-    it('code block with language', () => {
+    it('code block with language preserves language info', () => {
         const { html } = renderBoth('```js\nconst x = 1;\n```');
-        assert.equal(html, '<pre>const x = 1;</pre>');
+        assert.equal(html, '<pre><code class="language-js">const x = 1;</code></pre>');
+    });
+
+    it('code block with language escapes language string', () => {
+        const { html } = renderBoth('```c++\nint x;\n```');
+        assert.ok(html.includes('class="language-c++">'));
     });
 
     it('code block escapes HTML', () => {
@@ -163,7 +168,7 @@ describe('renderer-html — block spacing', () => {
         assert.equal(blocks[1], 'Paragraph');
         assert.equal(blocks[2], '- item');
         assert.equal(blocks[3], '&gt; quote');
-        assert.equal(blocks[4], '<pre>code</pre>');
+        assert.equal(blocks[4], '<pre>code</pre>'); // no lang → simple <pre>
         assert.equal(blocks[5], '---');
         assert.equal(blocks[6], 'End');
     });

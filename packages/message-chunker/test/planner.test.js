@@ -5,7 +5,7 @@ import { planDelivery } from '../src/planner.js';
 // Default transport profile for tests
 const transport = {
     maxTextLength: 4096,
-    safeTextBudget: 100,
+    safeTextBudget: 3600,
     supportsPlainText: true,
     supportsMultipartPlainText: true,
     supportsRichHtml: true,
@@ -75,16 +75,17 @@ describe('planner — preserve', () => {
 
 describe('planner — strategy escalation', () => {
     it('escalates from preserve to split-blocks', () => {
-        const md = 'First paragraph\n\nSecond paragraph';
-        const result = plan(md, { transport: { safeTextBudget: 20 } });
+        // Two paragraphs: each ~150 chars, together ~302 > 200
+        const md = 'First sentence here. '.repeat(8) + '\n\n' + 'Second sentence here. '.repeat(8);
+        const result = plan(md, { transport: { safeTextBudget: 200 } });
         assert.equal(result.chunks.length, 2);
         assert.equal(result.diagnostics.usedStrategy, 'split-blocks');
     });
 
     it('escalates past split-blocks-soft when atomic inline too large', () => {
         // Giant inline code in rich-html is atomic — can't split in split-blocks-soft
-        const md = '`' + 'x'.repeat(60) + '`';
-        const result = plan(md, { transport: { safeTextBudget: 30 } });
+        const md = '`' + 'x'.repeat(250) + '`';
+        const result = plan(md, { transport: { safeTextBudget: 200 } });
         assert.ok(result.chunks.length >= 2);
         assert.ok(
             result.diagnostics.usedStrategy === 'plain-text' ||
@@ -92,15 +93,15 @@ describe('planner — strategy escalation', () => {
             `expected plain-text or forced-plain-text, got ${result.diagnostics.usedStrategy}`
         );
         for (const chunk of result.chunks) {
-            assert.ok(chunk.content.length <= 30, `chunk too long: ${chunk.content.length}`);
+            assert.ok(chunk.content.length <= 200, `chunk too long: ${chunk.content.length}`);
         }
     });
 
     it('starting from a more aggressive strategy skips earlier ones', () => {
-        const md = 'First\n\nSecond';
+        const md = 'First sentence here. '.repeat(8) + '\n\n' + 'Second sentence here. '.repeat(8);
         const result = plan(md, {
             strategy: 'split-blocks',
-            transport: { safeTextBudget: 20 },
+            transport: { safeTextBudget: 200 },
         });
         assert.equal(result.diagnostics.usedStrategy, 'split-blocks');
         assert.equal(result.diagnostics.requestedStrategy, 'split-blocks');
@@ -111,30 +112,31 @@ describe('planner — strategy escalation', () => {
 
 describe('planner — split-blocks', () => {
     it('splits by top-level blocks', () => {
-        const md = 'Paragraph one\n\nParagraph two\n\nParagraph three';
-        const result = plan(md, { transport: { safeTextBudget: 30 } });
+        const p = 'Paragraph content here. '.repeat(6); // ~144 chars each
+        const md = p + '\n\n' + p + '\n\n' + p;
+        const result = plan(md, { transport: { safeTextBudget: 250 } });
         assert.ok(result.chunks.length >= 2);
         for (const chunk of result.chunks) {
-            assert.ok(chunk.content.length <= 30);
+            assert.ok(chunk.content.length <= 250);
         }
     });
 
     it('packs multiple blocks into one chunk when possible', () => {
         const md = 'Short\n\nAlso short';
-        const result = plan(md, { transport: { safeTextBudget: 50 } });
+        const result = plan(md, { transport: { safeTextBudget: 500 } });
         assert.equal(result.chunks.length, 1);
         assert.ok(result.chunks[0].content.includes('Short'));
         assert.ok(result.chunks[0].content.includes('Also short'));
     });
 
     it('greedy: maximal prefix, not balanced split', () => {
-        const md = 'A\n\nBB\n\nCCC';
-        // Budget 8: "A\n\nBB" = 6 fits, adding "\n\nCCC" = 11 doesn't
-        const result = plan(md, { transport: { safeTextBudget: 8 } });
+        // A=80, B=80, C=80. AB = 80+2+80 = 162 < 200. ABC = 162+2+80 = 244 > 200.
+        const md = 'A'.repeat(80) + '\n\n' + 'B'.repeat(80) + '\n\n' + 'C'.repeat(80);
+        const result = plan(md, { transport: { safeTextBudget: 200 } });
         assert.equal(result.chunks.length, 2);
-        assert.ok(result.chunks[0].content.includes('A'));
-        assert.ok(result.chunks[0].content.includes('BB'));
-        assert.equal(result.chunks[1].content, 'CCC');
+        assert.ok(result.chunks[0].content.includes('A'.repeat(80)));
+        assert.ok(result.chunks[0].content.includes('B'.repeat(80)));
+        assert.equal(result.chunks[1].content, 'C'.repeat(80));
     });
 });
 
@@ -143,21 +145,21 @@ describe('planner — split-blocks', () => {
 describe('planner — split-blocks-soft', () => {
     it('splits a long paragraph', () => {
         const sentence = 'This is a sentence. ';
-        const md = sentence.repeat(10); // ~200 chars
-        const result = plan(md, { transport: { safeTextBudget: 50 } });
+        const md = sentence.repeat(30); // ~600 chars
+        const result = plan(md, { transport: { safeTextBudget: 250 } });
         assert.ok(result.chunks.length >= 2);
         for (const chunk of result.chunks) {
-            assert.ok(chunk.content.length <= 50, `chunk ${chunk.index} too long: ${chunk.content.length}`);
+            assert.ok(chunk.content.length <= 250, `chunk ${chunk.index} too long: ${chunk.content.length}`);
         }
     });
 
     it('code_block stays atomic in rich-html', () => {
-        const code = '```\n' + 'x'.repeat(200) + '\n```';
+        const code = '```\n' + 'x'.repeat(300) + '\n```';
         const md = 'Before\n\n' + code;
         // In rich-html, code_block is atomic. If budget is small, must escalate.
         const result = plan(md, {
             strategy: 'split-blocks-soft',
-            transport: { safeTextBudget: 50 },
+            transport: { safeTextBudget: 250 },
         });
         // Should escalate to plain-text or forced-plain-text
         assert.ok(
@@ -171,14 +173,14 @@ describe('planner — split-blocks-soft', () => {
 
 describe('planner — plain-text strategy', () => {
     it('code_block can be split in plain-text', () => {
-        const code = '```\n' + 'line\n'.repeat(40) + '```';
+        const code = '```\n' + 'line\n'.repeat(80) + '```';
         const result = plan(code, {
             strategy: 'plain-text',
-            transport: { safeTextBudget: 60 },
+            transport: { safeTextBudget: 250 },
         });
         assert.ok(result.chunks.length >= 2);
         for (const chunk of result.chunks) {
-            assert.ok(chunk.content.length <= 60);
+            assert.ok(chunk.content.length <= 250);
             assert.equal(chunk.mode, 'plain-text');
         }
     });
@@ -188,27 +190,29 @@ describe('planner — plain-text strategy', () => {
 
 describe('planner — forced-plain-text', () => {
     it('splits very long text without spaces', () => {
-        const md = 'x'.repeat(250);
-        const result = plan(md, { transport: { safeTextBudget: 50 } });
+        const md = 'x'.repeat(1000);
+        const result = plan(md, { transport: { safeTextBudget: 200 } });
         assert.ok(result.chunks.length >= 5);
         for (const chunk of result.chunks) {
-            assert.ok(chunk.content.length <= 50);
+            assert.ok(chunk.content.length <= 200);
         }
     });
 
     it('prefers \\n\\n over \\n over whitespace', () => {
-        const md = 'First block\n\nSecond block\nthird line word';
-        const result = plan(md, { transport: { safeTextBudget: 25 } });
-        // First chunk should split at \n\n
-        assert.equal(result.chunks[0].content, 'First block');
+        // First block > needs to fit in budget, second part tests boundary
+        const md = 'A'.repeat(100) + '\n\n' + 'B'.repeat(100) + '\nthird line word';
+        const result = plan(md, { transport: { safeTextBudget: 200 } });
+        // First chunk should split at \n\n (A block = 100 chars)
+        assert.ok(result.chunks[0].content.includes('A'.repeat(100)));
+        assert.ok(!result.chunks[0].content.includes('B'));
     });
 
     it('handles surrogate pairs correctly', () => {
         const emoji = '\uD83D\uDE00'; // 😀
-        const md = emoji.repeat(30); // 60 code units
-        const result = plan(md, { transport: { safeTextBudget: 10 } });
+        const md = emoji.repeat(150); // 300 code units
+        const result = plan(md, { transport: { safeTextBudget: 200 } });
         for (const chunk of result.chunks) {
-            assert.ok(chunk.content.length <= 10);
+            assert.ok(chunk.content.length <= 200);
             // No orphaned surrogates
             for (let i = 0; i < chunk.content.length; i++) {
                 const code = chunk.content.charCodeAt(i);
@@ -223,10 +227,10 @@ describe('planner — forced-plain-text', () => {
     });
 
     it('code block split keeps balanced fences', () => {
-        const code = '```js\n' + 'x = 1;\n'.repeat(20) + '```';
+        const code = '```js\n' + 'x = 1;\n'.repeat(60) + '```';
         const result = plan(code, {
             strategy: 'forced-plain-text',
-            transport: { safeTextBudget: 50 },
+            transport: { safeTextBudget: 200 },
         });
         for (const chunk of result.chunks) {
             const opens = (chunk.content.match(/```/g) || []).length;
@@ -239,8 +243,8 @@ describe('planner — forced-plain-text', () => {
 
 describe('planner — chunk structure', () => {
     it('chunks have correct index and total', () => {
-        const md = 'A\n\nB\n\nC';
-        const result = plan(md, { transport: { safeTextBudget: 5 } });
+        const md = 'A'.repeat(150) + '\n\n' + 'B'.repeat(150) + '\n\n' + 'C'.repeat(150);
+        const result = plan(md, { transport: { safeTextBudget: 200 } });
         for (let i = 0; i < result.chunks.length; i++) {
             assert.equal(result.chunks[i].index, i);
             assert.equal(result.chunks[i].total, result.chunks.length);
@@ -282,25 +286,25 @@ describe('planner — diagnostics', () => {
     });
 
     it('reports degradation when strategy escalated', () => {
-        const md = 'A'.repeat(200);
-        const result = plan(md, { transport: { safeTextBudget: 50 } });
+        const md = 'A'.repeat(500);
+        const result = plan(md, { transport: { safeTextBudget: 200 } });
         assert.ok(result.diagnostics.hadDegradation);
     });
 
     it('reports degradedToPlainText', () => {
         // Giant code block is atomic in rich-html → forces plain-text degradation
-        const md = '```\n' + 'x'.repeat(200) + '\n```';
+        const md = '```\n' + 'x'.repeat(300) + '\n```';
         const result = plan(md, {
             preferredMode: 'rich-html',
-            transport: { safeTextBudget: 50 },
+            transport: { safeTextBudget: 250 },
         });
         assert.equal(result.diagnostics.degradedToPlainText, true);
     });
 
     it('reports splitBlockTypes', () => {
         const sentence = 'Word. ';
-        const md = sentence.repeat(30); // long paragraph
-        const result = plan(md, { transport: { safeTextBudget: 50 } });
+        const md = sentence.repeat(100); // long paragraph
+        const result = plan(md, { transport: { safeTextBudget: 250 } });
         if (result.diagnostics.usedStrategy === 'split-blocks-soft' ||
             result.diagnostics.usedStrategy === 'plain-text') {
             assert.ok(result.diagnostics.splitBlockTypes.includes('paragraph'));
@@ -315,16 +319,16 @@ describe('planner — budget invariant', () => {
         const cases = [
             'Simple text',
             '**Bold** and *italic* and `code`',
-            'A'.repeat(500),
-            'Word. '.repeat(100),
+            'A'.repeat(1000),
+            'Word. '.repeat(200),
             '# Title\n\n' + 'Para. '.repeat(50) + '\n\n- item1\n- item2\n\n> quote\n\n```\ncode\n```',
         ];
         for (const md of cases) {
-            const result = plan(md, { transport: { safeTextBudget: 40 } });
+            const result = plan(md, { transport: { safeTextBudget: 200 } });
             for (const chunk of result.chunks) {
                 assert.ok(
-                    chunk.content.length <= 40,
-                    `Budget exceeded: ${chunk.content.length} > 40 for strategy ${result.diagnostics.usedStrategy}: "${chunk.content.slice(0, 50)}..."`
+                    chunk.content.length <= 200,
+                    `Budget exceeded: ${chunk.content.length} > 200 for strategy ${result.diagnostics.usedStrategy}: "${chunk.content.slice(0, 50)}..."`
                 );
             }
         }
@@ -336,8 +340,8 @@ describe('planner — budget invariant', () => {
 describe('planner — determinism', () => {
     it('same input produces same plan', () => {
         const md = '# Title\n\nParagraph with **bold**.\n\n- item 1\n- item 2';
-        const r1 = plan(md, { transport: { safeTextBudget: 30 } });
-        const r2 = plan(md, { transport: { safeTextBudget: 30 } });
+        const r1 = plan(md, { transport: { safeTextBudget: 200 } });
+        const r2 = plan(md, { transport: { safeTextBudget: 200 } });
         assert.equal(r1.chunks.length, r2.chunks.length);
         for (let i = 0; i < r1.chunks.length; i++) {
             assert.equal(r1.chunks[i].content, r2.chunks[i].content);

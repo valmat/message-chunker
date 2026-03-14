@@ -58,15 +58,15 @@
 _Источник истины до синхронизации кода: `docs/rfc.md`. По критичному долгу по replanning см. `docs/refactoring-sourcerange.md`. По принятым ограничениям и уже согласованным решениям см. `docs/known-limitations.md`._
 
 ### Шаг 1. Сначала синхронизировать контракт RFC → код и документацию
-- [ ] Синхронизировать `RejectReason` с RFC: для модуля каноничны только `too-long` и `invalid-markup`; transport-level ошибки остаются за интеграцией
-- [ ] Синхронизировать валидацию `TransportProfile` с RFC: `safeTextBudget < 200` должен считаться invalid profile
-- [ ] Синхронизировать rich-html code block с RFC: вернуть `class="language-*"` для сохранения language info fenced block
-- [ ] Обновить README: привести описания контракта в соответствие RFC и добавить/обновить сценарии использования (`too-long`, `invalid-markup`, rich-html code block with language info)
+- [x] Синхронизировать `RejectReason` с RFC: для модуля каноничны только `too-long` и `invalid-markup`; transport-level ошибки остаются за интеграцией
+- [x] Синхронизировать валидацию `TransportProfile` с RFC: `safeTextBudget < 200` должен считаться invalid profile
+- [x] Синхронизировать rich-html code block с RFC: вернуть `class="language-*"` для сохранения language info fenced block
+- [x] Обновить README: привести описания контракта в соответствие RFC и добавить/обновить сценарии использования (`too-long`, `invalid-markup`, rich-html code block with language info)
 
 ### Шаг 2. Затем выполнить локальную синхронизацию тестов
-- [ ] Обновить/добавить тесты для `RejectReason` по новому контракту RFC
-- [ ] Обновить/добавить тесты для минимального `safeTextBudget >= 200`
-- [ ] Обновить/добавить тесты на rich-html code block с language info
+- [x] Обновить/добавить тесты для `RejectReason` по новому контракту RFC
+- [x] Обновить/добавить тесты для минимального `safeTextBudget >= 200`
+- [x] Обновить/добавить тесты на rich-html code block с language info
 
 ### Шаг 3. Затем сделать критичную функциональную доработку
 - [ ] Исправить `SourceRange`/`replanTail()` так, чтобы reject внутри split-блока не переотправлял уже доставленный префикс → [docs/refactoring-sourcerange.md](docs/refactoring-sourcerange.md)

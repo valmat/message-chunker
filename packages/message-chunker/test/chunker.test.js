@@ -58,12 +58,42 @@ describe('types and constants', () => {
             countMethod: 'string-length',
         }), /must not exceed/);
     });
+
+    it('validateTransportProfile rejects safeTextBudget < 200', () => {
+        assert.throws(() => validateTransportProfile({
+            maxTextLength: 4096,
+            safeTextBudget: 199,
+            supportsPlainText: true,
+            supportsMultipartPlainText: true,
+            supportsRichHtml: true,
+            countMethod: 'string-length',
+        }), /at least 200/);
+
+        assert.throws(() => validateTransportProfile({
+            maxTextLength: 4096,
+            safeTextBudget: 100,
+            supportsPlainText: true,
+            supportsMultipartPlainText: true,
+            supportsRichHtml: true,
+            countMethod: 'string-length',
+        }), /at least 200/);
+
+        // Exactly 200 should be accepted
+        assert.doesNotThrow(() => validateTransportProfile({
+            maxTextLength: 4096,
+            safeTextBudget: 200,
+            supportsPlainText: true,
+            supportsMultipartPlainText: true,
+            supportsRichHtml: true,
+            countMethod: 'string-length',
+        }));
+    });
 });
 
 describe('public API exports', () => {
     const tp = {
         maxTextLength: 4096,
-        safeTextBudget: 100,
+        safeTextBudget: 3600,
         supportsPlainText: true,
         supportsMultipartPlainText: true,
         supportsRichHtml: true,
@@ -82,19 +112,20 @@ describe('public API exports', () => {
     });
 
     it('replanTail is exported and works', () => {
+        const md = 'First paragraph. '.repeat(20) + '\n\n' + 'Second paragraph. '.repeat(20);
         const original = planDelivery({
-            markdown: 'First\n\nSecond',
+            markdown: md,
             preferredMode: 'auto',
             strategy: 'preserve',
-            transport: { ...tp, safeTextBudget: 10 },
+            transport: { ...tp, safeTextBudget: 250 },
         });
         const tail = replanTail({
-            markdown: 'First\n\nSecond',
+            markdown: md,
             previousPlan: original,
             failedChunkIndex: 0,
             preferredMode: 'auto',
             nextStrategy: 'preserve',
-            transport: { ...tp, safeTextBudget: 10 },
+            transport: { ...tp, safeTextBudget: 250 },
             rejectReason: 'too-long',
         });
         assert.ok(tail.chunks.length >= 1);
