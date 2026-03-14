@@ -57,18 +57,19 @@
 
 ## Стадия 9: Открытые вопросы после ревью RFC
 - [ ] Исправить `SourceRange`/`replanTail()` так, чтобы reject внутри split-блока не переотправлял уже доставленный префикс → [docs/refactoring-sourcerange.md](docs/refactoring-sourcerange.md)
-- [ ] Согласовать контракт `rejectReason`: либо вернуть код к значениям RFC (`too-long`, `invalid-markup`, `transport-reject`), либо обновить RFC/README/типы единообразно
+- [ ] Синхронизировать контракт `rejectReason` с обновлённым RFC: для модуля каноничны только `too-long` и `invalid-markup`; транспортные ошибки вне этой классификации остаются за интеграцией
 - [ ] Синхронизировать реализацию rich-html code block с обновлённым RFC: разрешён `class="language-*"` для сохранения language info fenced block
-- [ ] Явно определить политику для `hadDegradation` при unsupported markdown: либо реализовать сигнал из normalizer, либо зафиксировать это как сознательное отклонение от RFC
-- [ ] Решить policy для экстремально маленького бюджета у code block: либо оставить текущий аварийный fallback как documented limitation, либо скорректировать RFC под фактическое поведение
+- [x] Зафиксировать, что `hadDegradation` для unsupported markdown не является обязательным требованием v1; допустимы документация и логирование как nice-to-have
+- [ ] Синхронизировать валидацию `TransportProfile` с обновлённым RFC: `safeTextBudget < 200` должен считаться invalid profile
 
 
 ## Handoff: порядок следующей итерации
 
 ### Шаг 1. Сначала принять проектные решения
-- [ ] Принять решение по `rejectReason`: канонизируем RFC-термины (`too-long`, `invalid-markup`, `transport-reject`) или переносим проект на новые термины; после решения синхронизировать RFC, typedef, README и runtime-валидацию
-- [ ] Принять решение по tiny-budget `code_block`: это допустимое documented limitation v1 или RFC должен разрешить аварийный raw-text fallback
-- [ ] Подтвердить, что `hadDegradation` для unsupported markdown остаётся limitation v1, а не обязательная задача ближайшей итерации
+- [ ] Зафиксировать каноническую product policy для `too-long`: уменьшать budget сначала или сразу эскалировать strategy (RFC это пока намеренно не навязывает)
+- [x] Зафиксировано: модуль различает только `too-long` и `invalid-markup`; прочие transport-level ошибки остаются вне спецификации модуля
+- [x] Зафиксировано: unreasonable budgets не поддерживаются; в RFC введён минимальный `safeTextBudget` для v1
+- [x] Зафиксировано: для unsupported markdown достаточно документации/логирования; обязательной продуктовой реакции в v1 не требуется
 
 ### Шаг 2. Затем выполнить обязательную синхронизацию RFC → код
 - [ ] Вернуть поддержку rich-html fenced code block с language info согласно обновлённому RFC (`<pre><code class="language-LANG">...</code></pre>`)

@@ -751,6 +751,8 @@ interface TransportProfile {
 ### Rules
 
 - safeTextBudget <= maxTextLength
+- for v1 a supported transport profile must have `safeTextBudget >= 200`
+- a profile with `safeTextBudget < 200` is considered invalid for this RFC version, because such budgets are treated as unreasonable transport constraints rather than as a normal planning scenario
 - the planner uses safeTextBudget, not the formal transport limit
 - budget policy can be reduced by external code after a reject
 - validity of a chunk is checked by the length of the final rendered content
@@ -899,14 +901,15 @@ If the transport rejected the chunk with index i, then:
 
 ### 18.2. Reasons of reject
 
-Minimal supported reasons:
+Minimal supported reasons of reject for the module itself:
 
 ```ts
 type RejectReason =
   | 'too-long'
-  | 'invalid-markup'
-  | 'transport-reject';
+  | 'invalid-markup';
 ```
+
+Other transport-level failures are outside the scope of this module. The integration layer may classify a transport error as `too-long`, `invalid-markup`, or decide that replanning must not be used for this failure at all.
 
 ### 18.3. Replanning contract
 
@@ -940,11 +943,16 @@ replanTail() in v1 must escalate strategies itself the same way as planDelivery(
 ### 18.4. Semantics
 
 - for too-long the caller usually:
-  - passes the same preferredMode as used before,
-  - lowers the budget,
-  - if needed, raises the aggressiveness of the strategy;
+  - passes the same preferredMode as used before;
+  - rebuilds the tail more aggressively from the point of view of delivery constraints.
+
+  In v1 this RFC intentionally does not fix one mandatory order between:
+  - lowering the budget first and escalating the strategy later;
+  - escalating the strategy first without changing the budget.
+
+  This choice is left to the integration / product policy.
 - for invalid-markup the caller usually:
-  - passes preferredMode: 'plain-text',
+  - passes preferredMode: 'plain-text';
   - if needed, raises the strategy.
 
 Semantics of preferredMode for replanTail() matches planDelivery():
@@ -953,7 +961,7 @@ Semantics of preferredMode for replanTail() matches planDelivery():
 - rich-html means to try to build the tail in rich mode with allowed further degradation to plain-text if needed for success;
 - plain-text means to plan the tail in plain text right away without a new attempt to start with rich-html.
 
-For v1 the recommended reaction to invalid-markup is normatively simplified to switching rich-html -> plain-text for the undelivered tail. Attempts to “heal” the markup by more aggressive rich split are not required in v1.
+For v1 the reaction to invalid-markup is normatively simplified to switching rich-html -> plain-text for the undelivered tail. Attempts to “heal” the markup by more aggressive rich split are not required in v1.
 
 ### 18.5. Important consequence
 
@@ -1098,7 +1106,8 @@ The external integration layer is responsible for:
 
 - actual sending;
 - sequential sending of chunks;
-- handling rejects;
+- handling transport errors that are not reduced to `too-long` or `invalid-markup`;
+- classifying a transport failure into a module-level replanning reason or deciding that replanning is not applicable;
 - choosing the next strategy;
 - reducing the budget;
 - retry orchestration;
