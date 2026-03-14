@@ -23,18 +23,20 @@ export function normalize(markdown) {
  * @param {number} openIndex
  * @returns {number}
  */
-function findMatchingClose(tokens, openIndex) {
+function findMatchingClose(tokens, openIndex, end = tokens.length) {
     const openType = tokens[openIndex].type;
     const closeType = openType.replace('_open', '_close');
     let depth = 1;
-    for (let i = openIndex + 1; i < tokens.length; i++) {
+    for (let i = openIndex + 1; i < end; i++) {
         if (tokens[i].type === openType) depth++;
         else if (tokens[i].type === closeType) {
             depth--;
             if (depth === 0) return i;
         }
     }
-    return tokens.length;
+    // No matching close found — return end-1 so the caller's
+    // `closeIdx + 1` does not overshoot the boundary.
+    return end - 1;
 }
 
 /**
@@ -53,25 +55,28 @@ function normalizeBlocks(tokens, start, end) {
 
         switch (token.type) {
             case 'paragraph_open': {
-                const inlineToken = tokens[i + 1];
+                const inlineToken = (i + 1 < end && tokens[i + 1].type === 'inline')
+                    ? tokens[i + 1] : null;
                 const children = normalizeInline(inlineToken ? inlineToken.children : null);
                 nodes.push({ type: 'paragraph', children });
-                i += 3;
+                // Advance past open + inline + close; if inline is missing, skip just the open
+                i += inlineToken ? 3 : 1;
                 break;
             }
 
             case 'heading_open': {
                 const level = parseInt(token.tag.slice(1));
-                const inlineToken = tokens[i + 1];
+                const inlineToken = (i + 1 < end && tokens[i + 1].type === 'inline')
+                    ? tokens[i + 1] : null;
                 const children = normalizeInline(inlineToken ? inlineToken.children : null);
                 nodes.push({ type: 'heading', level, children });
-                i += 3;
+                i += inlineToken ? 3 : 1;
                 break;
             }
 
             case 'bullet_list_open':
             case 'ordered_list_open': {
-                const closeIdx = findMatchingClose(tokens, i);
+                const closeIdx = findMatchingClose(tokens, i, end);
                 const ordered = token.type === 'ordered_list_open';
                 const startNum = ordered
                     ? parseInt(getAttr(token, 'start') || '1')
@@ -83,7 +88,7 @@ function normalizeBlocks(tokens, start, end) {
 
                 while (j < closeIdx) {
                     if (tokens[j].type === 'list_item_open') {
-                        const itemCloseIdx = findMatchingClose(tokens, j);
+                        const itemCloseIdx = findMatchingClose(tokens, j, closeIdx);
                         const innerBlocks = normalizeBlocks(tokens, j + 1, itemCloseIdx);
                         const marker = ordered
                             ? `${(startNum || 1) + itemIdx}.`
@@ -107,7 +112,7 @@ function normalizeBlocks(tokens, start, end) {
             }
 
             case 'blockquote_open': {
-                const closeIdx = findMatchingClose(tokens, i);
+                const closeIdx = findMatchingClose(tokens, i, end);
                 const innerBlocks = normalizeBlocks(tokens, i + 1, closeIdx);
                 nodes.push({ type: 'quote', children: innerBlocks });
                 i = closeIdx + 1;
