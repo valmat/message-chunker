@@ -1,9 +1,9 @@
 # MessageChunker — План разработки
 
 ## Стадия 1: Инфраструктура и типы
-- [ ] Установить зависимости (markdown-it)
-- [ ] Определить все типы и интерфейсы (IR-ноды, TransportProfile, PlanRequest, PlannedChunk, DeliveryPlan, диагностика и т.д.)
-- [ ] Определить структуру модулей (parser, normalizer, renderer, planner, public API)
+- [x] Установить зависимости (markdown-it)
+- [x] Определить все типы и интерфейсы (IR-ноды, TransportProfile, PlanRequest, PlannedChunk, DeliveryPlan, диагностика и т.д.)
+- [x] Определить структуру модулей (parser, normalizer, renderer, planner, public API)
 
 ## Стадия 2: Парсер и нормализатор
 - [ ] Реализовать парсинг markdown → IR (на базе markdown-it)
