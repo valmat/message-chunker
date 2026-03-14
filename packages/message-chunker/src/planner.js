@@ -1103,14 +1103,149 @@ function blockRenderedOffsetToCursor(block, renderedOffset, blockIdx) {
     if (block.type === 'code_block') {
         return codeBlockRenderedOffsetToCursor(block, renderedOffset, blockIdx);
     }
-    // For other block types, use first/last leaf as approximation
-    if (renderedOffset === 0) {
-        const cursor = findFirstLeafCursorInner(block, []);
-        return { path: [blockIdx, ...cursor.path], offsetUtf16: cursor.offsetUtf16 };
+    if (block.type === 'quote') {
+        return quoteRenderedOffsetToCursor(block, renderedOffset, blockIdx);
     }
-    // Approximate: treat as fraction of total text
+    if (block.type === 'list') {
+        return listRenderedOffsetToCursor(block, renderedOffset, blockIdx);
+    }
+    // For other block types (thematic_break, etc.), first leaf is accurate
     const cursor = findFirstLeafCursorInner(block, []);
     return { path: [blockIdx, ...cursor.path], offsetUtf16: cursor.offsetUtf16 };
+}
+
+/**
+ * Map a rendered plain-text offset of a quote block to a SourceCursor.
+ * Quote rendered as "> "-prefixed lines of child blocks joined by "\n\n".
+ */
+function quoteRenderedOffsetToCursor(quote, renderedOffset, blockIdx) {
+    const childRendered = quote.children.map(c => renderBlocks([c], 'plain-text'));
+    const inner = childRendered.join('\n\n');
+    const quotedLines = inner.split('\n').map(line => line === '' ? '>' : '> ' + line);
+    const fullRendered = quotedLines.join('\n');
+
+    // Walk child blocks to find which one contains the offset
+    let pos = 0;
+    for (let ci = 0; ci < quote.children.length; ci++) {
+        const childText = childRendered[ci];
+        const childQuotedLines = childText.split('\n').map(l => l === '' ? '>' : '> ' + l);
+        const childQuoted = childQuotedLines.join('\n');
+        // Separator between child blocks in quoted form: "\n>\n" (from "\n\n" → lines ["", ""] → ">", "")
+        const sep = ci > 0 ? '\n>\n' : '';
+
+        if (renderedOffset < pos + sep.length + childQuoted.length || ci === quote.children.length - 1) {
+            const offsetInChildQuoted = Math.max(0, renderedOffset - pos - sep.length);
+            const innerOffset = quotedOffsetToInnerOffset(childQuoted, offsetInChildQuoted);
+            const childBlock = quote.children[ci];
+            const innerCursor = blockRenderedOffsetToCursor(childBlock, innerOffset, 0);
+            return { path: [blockIdx, ci, ...innerCursor.path.slice(1)], offsetUtf16: innerCursor.offsetUtf16 };
+        }
+        pos += sep.length + childQuoted.length;
+    }
+    const endC = findLastLeafCursorInner(quote, []);
+    return { path: [blockIdx, ...endC.path], offsetUtf16: endC.offsetUtf16 };
+}
+
+/**
+ * Convert offset within "> "-prefixed text to offset within inner text.
+ */
+function quotedOffsetToInnerOffset(quotedText, offsetInQuoted) {
+    let innerOff = 0;
+    let qOff = 0;
+    const lines = quotedText.split('\n');
+    for (let li = 0; li < lines.length; li++) {
+        if (li > 0) { qOff += 1; innerOff += 1; }
+        const line = lines[li];
+        const prefixLen = line === '>' ? 1 : line.startsWith('> ') ? 2 : 0;
+        if (offsetInQuoted <= qOff + prefixLen) return innerOff;
+        if (offsetInQuoted < qOff + line.length) return innerOff + (offsetInQuoted - qOff - prefixLen);
+        qOff += line.length;
+        innerOff += line.length - prefixLen;
+    }
+    return innerOff;
+}
+
+/**
+ * Map a rendered plain-text offset of a list block to a SourceCursor.
+ * List items rendered as "marker content" joined by "\n".
+ */
+function listRenderedOffsetToCursor(list, renderedOffset, blockIdx) {
+    let pos = 0;
+    for (let ii = 0; ii < list.children.length; ii++) {
+        const item = list.children[ii];
+        const itemRendered = renderListItemForCursor(item);
+        const sep = ii > 0 ? 1 : 0; // "\n" between items
+
+        if (renderedOffset < pos + sep + itemRendered.length || ii === list.children.length - 1) {
+            const offsetInItem = Math.max(0, renderedOffset - pos - sep);
+            return listItemRenderedOffsetToCursor(item, offsetInItem, blockIdx, ii);
+        }
+        pos += sep + itemRendered.length;
+    }
+    const endC = findLastLeafCursorInner(list, []);
+    return { path: [blockIdx, ...endC.path], offsetUtf16: endC.offsetUtf16 };
+}
+
+function renderListItemForCursor(item) {
+    const prefix = item.marker + ' ';
+    const indent = '  ';
+    const blocks = item.children.map(c => renderBlocks([c], 'plain-text'));
+    if (blocks.length === 0) return prefix;
+    let result = prefix + blocks[0];
+    for (let i = 1; i < blocks.length; i++) {
+        result += '\n' + blocks[i].split('\n').map(l => indent + l).join('\n');
+    }
+    return result;
+}
+
+function listItemRenderedOffsetToCursor(item, offsetInItem, blockIdx, itemIdx) {
+    const prefix = item.marker + ' ';
+    const indent = '  ';
+
+    if (offsetInItem < prefix.length) {
+        const cursor = findFirstLeafCursorInner(item, []);
+        return { path: [blockIdx, itemIdx, ...cursor.path], offsetUtf16: 0 };
+    }
+
+    let pos = prefix.length;
+    for (let ci = 0; ci < item.children.length; ci++) {
+        const childBlock = item.children[ci];
+        const childRendered = renderBlocks([childBlock], 'plain-text');
+        const indentedRendered = ci === 0
+            ? childRendered
+            : childRendered.split('\n').map(l => indent + l).join('\n');
+        const sep = ci > 0 ? 1 : 0; // "\n"
+
+        if (offsetInItem < pos + sep + indentedRendered.length || ci === item.children.length - 1) {
+            let offsetInChild = Math.max(0, offsetInItem - pos - sep);
+            if (ci > 0) {
+                offsetInChild = indentedOffsetToInner(indentedRendered, offsetInChild, indent);
+            }
+            const innerCursor = blockRenderedOffsetToCursor(childBlock, offsetInChild, 0);
+            return {
+                path: [blockIdx, itemIdx, ci, ...innerCursor.path.slice(1)],
+                offsetUtf16: innerCursor.offsetUtf16,
+            };
+        }
+        pos += sep + indentedRendered.length;
+    }
+    const endC = findLastLeafCursorInner(item, []);
+    return { path: [blockIdx, itemIdx, ...endC.path], offsetUtf16: endC.offsetUtf16 };
+}
+
+function indentedOffsetToInner(indentedText, offset, indent) {
+    const lines = indentedText.split('\n');
+    let iOff = 0;
+    let innerOff = 0;
+    for (let li = 0; li < lines.length; li++) {
+        if (li > 0) { iOff += 1; innerOff += 1; }
+        const pLen = lines[li].startsWith(indent) ? indent.length : 0;
+        if (offset <= iOff + pLen) return innerOff;
+        if (offset < iOff + lines[li].length) return innerOff + (offset - iOff - pLen);
+        iOff += lines[li].length;
+        innerOff += lines[li].length - pLen;
+    }
+    return innerOff;
 }
 
 // =============== source range computation ===============
@@ -1167,22 +1302,17 @@ function finalizeChunks(chunkData, ir, blockOffset = 0) {
             // Use precise cursors from split
             const startPath = [...cd.sourceStart.path];
             startPath[0] += blockOffset;
-            const endPath = cd.sourceEnd
-                ? [...cd.sourceEnd.path]
-                : findLastLeafCursor(ir.children[cd.blockEnd], [cd.blockEnd]).path;
+            let endCursor;
             if (cd.sourceEnd) {
-                endPath[0] += blockOffset;
+                endCursor = cd.sourceEnd;
             } else {
-                endPath[0] += blockOffset;
+                endCursor = findLastLeafCursor(ir.children[cd.blockEnd], [cd.blockEnd]);
             }
+            const endPath = [...endCursor.path];
+            endPath[0] += blockOffset;
             sr = {
                 start: { path: startPath, offsetUtf16: cd.sourceStart.offsetUtf16 },
-                end: {
-                    path: endPath,
-                    offsetUtf16: cd.sourceEnd
-                        ? cd.sourceEnd.offsetUtf16
-                        : findLastLeafCursor(ir.children[cd.blockEnd], [cd.blockEnd]).offsetUtf16,
-                },
+                end: { path: endPath, offsetUtf16: endCursor.offsetUtf16 },
             };
         } else {
             sr = computeSourceRange(ir, cd.blockStart, cd.blockEnd);
