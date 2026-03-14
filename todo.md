@@ -6,11 +6,12 @@
 - [x] Определить структуру модулей (parser, normalizer, renderer, planner, public API)
 
 ## Стадия 2: Парсер и нормализатор
-- [ ] Реализовать парсинг markdown → IR (на базе markdown-it)
-- [ ] Нормализация: поддерживаемые блоки (paragraph, heading, list, list_item, quote, code_block, thematic_break)
-- [ ] Нормализация: инлайн-типы (text, strong, emphasis, inline_code, link, soft_break, hard_break)
-- [ ] Обработка неподдерживаемых конструкций (таблицы → plain text, raw HTML → literal text, footnotes и т.д.)
-- [ ] Тесты парсера/нормализатора
+- [x] Реализовать парсинг markdown → IR (на базе markdown-it)
+- [x] Нормализация: поддерживаемые блоки (paragraph, heading, list, list_item, quote, code_block, thematic_break)
+- [x] Нормализация: инлайн-типы (text, strong, emphasis, inline_code, link, soft_break, hard_break)
+- [x] Обработка неподдерживаемых конструкций (таблицы → plain text, raw HTML → literal text, images → text)
+- [x] Underscore emphasis (_/__) → literal text (решение из RFC 9.1)
+- [x] Тесты парсера/нормализатора (36 тестов)
 
 ## Стадия 3: Рендереры
 - [ ] rich-html рендерер (safe HTML subset: b, i, code, pre, a)
