@@ -55,20 +55,37 @@
 - [x] Задокументированы осознанные ограничения v1 → [docs/known-limitations.md](docs/known-limitations.md)
 
 ## Стадия 9: Актуальные задачи следующей итерации
-_Источник истины до синхронизации кода: `docs/rfc.md`. По критичному долгу по replanning см. `docs/refactoring-sourcerange.md`. По принятым ограничениям и уже согласованным решениям см. `docs/known-limitations.md`._
+_Источник истины до синхронизации кода: `docs/rfc.md`. По итогам комплексного ревью см. также `rfc_violations.md`, `issues.md` и добавленные regression-тесты в `packages/message-chunker/test/planner.test.js` и `packages/message-chunker/test/replan.test.js`._
 
-### Шаг 1. Сначала синхронизировать контракт RFC → код и документацию
+### Открытые задачи — в порядке важности
+
+#### Критично
+- [ ] Исправить возврат oversized-чанка для длинного continuation-блока внутри `list_item`: `planDelivery()` не должен возвращать чанки длиннее `safeTextBudget`; см. `rfc_violations.md` (п. 1) и `issues.md` (пп. 1–2).
+- [ ] Добавить финальную runtime-валидацию собранного плана в `planDelivery()/planFromIr()`: каждый итоговый чанк должен повторно проверяться по `content.length <= safeTextBudget`, чтобы локальная ошибка в splitter'е не пробивала публичный инвариант; см. `issues.md` (п. 1).
+- [ ] Исправить обработку длинного `heading`: заголовок должен корректно деградировать по RFC и не ломать `sourceRange`/`replanTail()`; см. `rfc_violations.md` (п. 2) и `issues.md` (п. 3).
+- [ ] Исправить `sourceRange` для forced-split `heading`, чтобы соседние фрагменты имели разные `sourceRange.start`, а `replanTail()` не переотправлял уже доставленный префикс; см. `rfc_violations.md` (п. 2) и `issues.md` (п. 3).
+
+#### Высоко
+- [ ] Явно валидировать входные `strategy` и `preferredMode` в `planDelivery()`, чтобы API не принимал мусорные значения молча и не падал общей internal error; см. `issues.md` (п. 4).
+- [ ] Довести diagnostics до полного соответствия RFC для unsupported markdown: raw HTML / tables / другие lowered-to-text конструкции должны выставлять `hadDegradation = true`; см. `rfc_violations.md` (п. 3) и `issues.md` (п. 5).
+
+#### Средне
+- [ ] После исправления проблем синхронизировать/расширить regression-тесты так, чтобы новые найденные кейсы оставались закрытыми навсегда: oversized `list_item`, forced-split `heading`, `replanTail()` по заголовку, degradation diagnostics, validation errors; см. `issues.md` и текущие красные тесты.
+
+### Выполнено в предыдущей итерации
+
+#### Контракт RFC → код и документация
 - [x] Синхронизировать `RejectReason` с RFC: для модуля каноничны только `too-long` и `invalid-markup`; transport-level ошибки остаются за интеграцией
 - [x] Синхронизировать валидацию `TransportProfile` с RFC: `safeTextBudget < 200` должен считаться invalid profile
 - [x] Синхронизировать rich-html code block с RFC: вернуть `class="language-*"` для сохранения language info fenced block
 - [x] Обновить README: привести описания контракта в соответствие RFC и добавить/обновить сценарии использования (`too-long`, `invalid-markup`, rich-html code block with language info)
 
-### Шаг 2. Затем выполнить локальную синхронизацию тестов
+#### Синхронизация тестов под обновлённый контракт
 - [x] Обновить/добавить тесты для `RejectReason` по новому контракту RFC
 - [x] Обновить/добавить тесты для минимального `safeTextBudget >= 200`
 - [x] Обновить/добавить тесты на rich-html code block с language info
 
-### Шаг 3. Затем сделать критичную функциональную доработку
+#### Критичная функциональная доработка, уже завершённая ранее
 - [x] Исправить `SourceRange`/`replanTail()` так, чтобы reject внутри split-блока не переотправлял уже доставленный префикс → [docs/refactoring-sourcerange.md](docs/refactoring-sourcerange.md)
 - [x] Реализовать точный `SourceRange` для split-fragments по плану из `docs/refactoring-sourcerange.md`
 - [x] Научить `replanTail()` восстанавливать хвост по полному `path` + `offsetUtf16`, а не только по `path[0]`
@@ -81,11 +98,13 @@ _Источник истины до синхронизации кода: `docs/r
 - [x] Для unsupported markdown достаточно документации/логирования; обязательной продуктовой реакции в v1 не требуется
 - [x] Iterator / streaming API — возможное расширение после v1, не задача текущей итерации
 
-### Принятый техдолг релиза
-- [ ] Довести diagnostics до полного соответствия RFC для unsupported markdown: сейчас RFC всё ещё требует фиксировать такую деградацию в diagnostics (`docs/rfc.md:706`, `docs/rfc.md:1031`), а текущая реализация `hadDegradation` учитывает только деградацию стратегии/режима в planner (`packages/message-chunker/src/planner.js:1334`). Это осознанно принято как нерелиз-блокирующий техдолг и должно быть пересмотрено в одной из следующих итераций.
+### Отложенный техдолг релиза
+- [ ] Пересмотреть семантику diagnostics для unsupported markdown после закрытия критичных багов: сейчас это уже оформлено как конкретная открытая задача выше, поэтому сюда относится только возможная последующая полировка структуры diagnostics и observability.
 
 ### Definition of done для следующей итерации
-- [x] RFC, README, typedef, runtime-валидация и тесты не противоречат друг другу
-- [x] Клиентская ответственность за orchestration после reject явно сохранена и не размыта кодом библиотеки
-- [x] Есть тест, который воспроизводит intra-block reject и подтверждает отсутствие повторной отправки уже доставленного текста
-- [x] README содержит не только API-описание, но и сценарии использования для типовых reject-потоков
+- [ ] Ни один путь планирования не возвращает чанк длиннее `safeTextBudget`.
+- [ ] `heading` не вызывает дублирование уже доставленного текста при `replanTail()`.
+- [ ] `sourceRange` корректен для forced-split фрагментов, в том числе для длинных заголовков.
+- [ ] `planDelivery()` явно валидирует `strategy` и `preferredMode`.
+- [ ] `hadDegradation` отражает понижение unsupported markdown до текстового представления.
+- [ ] Все добавленные regression-тесты становятся зелёными и остаются в suite.

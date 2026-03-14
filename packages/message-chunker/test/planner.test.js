@@ -310,6 +310,39 @@ describe('planner — diagnostics', () => {
             assert.ok(result.diagnostics.splitBlockTypes.includes('paragraph'));
         }
     });
+
+    it('reports degradation for unsupported raw HTML lowered to text', () => {
+        const result = plan('<b>x</b>', {
+            preferredMode: 'rich-html',
+            strategy: 'preserve',
+            transport: { safeTextBudget: 500 },
+        });
+
+        assert.equal(result.chunks.length, 1);
+        assert.equal(result.chunks[0].content, '&lt;b&gt;x&lt;/b&gt;');
+        assert.equal(
+            result.diagnostics.hadDegradation,
+            true,
+            'raw HTML is lowered to literal text and must be reported as degradation'
+        );
+    });
+
+    it('reports degradation for unsupported table lowered to plain text', () => {
+        const md = '| A | B |\n| - | - |\n| 1 | 2 |';
+        const result = plan(md, {
+            preferredMode: 'plain-text',
+            strategy: 'preserve',
+            transport: { safeTextBudget: 500 },
+        });
+
+        assert.equal(result.chunks.length, 1);
+        assert.equal(result.chunks[0].content, md);
+        assert.equal(
+            result.diagnostics.hadDegradation,
+            true,
+            'unsupported table syntax is lowered to text and must be reported as degradation'
+        );
+    });
 });
 
 // =============== budget invariant ===============
@@ -332,6 +365,53 @@ describe('planner — budget invariant', () => {
                 );
             }
         }
+    });
+
+    it('never returns an oversized continuation chunk for split list items', () => {
+        const md = '- short\n\n  ' + 'word '.repeat(80);
+        const budget = 200;
+        const result = plan(md, {
+            preferredMode: 'plain-text',
+            strategy: 'split-blocks-soft',
+            transport: { safeTextBudget: budget },
+        });
+
+        assert.ok(result.chunks.length >= 2, `expected split plan, got ${result.chunks.length} chunks`);
+        for (const chunk of result.chunks) {
+            assert.ok(
+                chunk.content.length <= budget,
+                `Budget exceeded for list-item continuation: ${chunk.content.length} > ${budget}; ` +
+                `content=${JSON.stringify(chunk.content)}`
+            );
+        }
+    });
+});
+
+// =============== validation ===============
+
+describe('planner — validation', () => {
+    it('throws on unknown strategy', () => {
+        assert.throws(
+            () => planDelivery({
+                markdown: 'Hello',
+                preferredMode: 'plain-text',
+                strategy: 'unknown-strategy',
+                transport,
+            }),
+            /Unknown strategy/
+        );
+    });
+
+    it('throws on unknown preferredMode', () => {
+        assert.throws(
+            () => planDelivery({
+                markdown: 'Hello',
+                preferredMode: 'weird-mode',
+                strategy: 'preserve',
+                transport,
+            }),
+            /Unknown preferredMode/
+        );
     });
 });
 

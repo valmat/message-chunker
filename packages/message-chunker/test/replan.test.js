@@ -538,6 +538,55 @@ describe('replanTail — intra-block reject: code block', () => {
     });
 });
 
+describe('replanTail — regression: long heading', () => {
+    it('split heading fragments must have distinct sourceRange.start cursors', () => {
+        const md = '# ' + 'word '.repeat(100);
+        const budget = 200;
+        const original = plan(md, {
+            preferredMode: 'rich-html',
+            strategy: 'preserve',
+            transport: { safeTextBudget: budget },
+        });
+
+        assert.ok(original.chunks.length >= 3, `expected >= 3 chunks, got ${original.chunks.length}`);
+
+        const starts = original.chunks.map(c => c.sourceRange.start);
+        for (let i = 1; i < starts.length; i++) {
+            assert.ok(
+                !pathAndOffsetEqual(starts[i - 1], starts[i]),
+                `heading chunks ${i - 1} and ${i} have identical start cursor: ` +
+                `${JSON.stringify(starts[i])}`
+            );
+        }
+    });
+
+    it('replanTail must not re-send delivered prefix for split heading', () => {
+        const md = '# ' + 'word '.repeat(100);
+        const budget = 200;
+        const original = plan(md, {
+            preferredMode: 'rich-html',
+            strategy: 'preserve',
+            transport: { safeTextBudget: budget },
+        });
+
+        assert.ok(original.chunks.length >= 3, `expected >= 3 chunks, got ${original.chunks.length}`);
+
+        const delivered = original.chunks[0].content;
+        const tail = replan(md, original, 1, {
+            preferredMode: 'plain-text',
+            nextStrategy: 'forced-plain-text',
+            transport: { safeTextBudget: budget },
+            rejectReason: 'too-long',
+        });
+
+        const tailFull = tail.chunks.map(c => c.content).join('');
+        assert.ok(
+            !tailFull.includes(delivered),
+            'tail should not contain the already-delivered heading prefix'
+        );
+    });
+});
+
 // Helper: compare cursor path+offset
 function pathAndOffsetEqual(a, b) {
     if (a.offsetUtf16 !== b.offsetUtf16) return false;
