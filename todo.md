@@ -44,5 +44,6 @@
 - [x] Nasty cases: giant paragraph, giant code block, long line without spaces, giant URL, giant inline code, broken markdown, raw HTML, emoji/ZWJ/combining, nested lists, quote+code+link, reject mid-sequence (26 тестов)
 
 ## Стадия 7: Публичный API и документация
-- [ ] Экспорт публичного API (planDelivery, replanTail, типы)
-- [ ] README с описанием модуля, API и примерами
+- [x] Экспорт публичного API (planDelivery, replanTail, helpers)
+- [x] Тесты экспорта через index.js
+- [x] README с описанием модуля, API, примерами и ограничениями

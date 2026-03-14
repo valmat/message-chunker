@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+    planDelivery,
+    replanTail,
     STRATEGY_LADDER,
     nextStrategy,
     isAtLeastAsAggressive,
@@ -55,5 +57,47 @@ describe('types and constants', () => {
             supportsRichHtml: true,
             countMethod: 'string-length',
         }), /must not exceed/);
+    });
+});
+
+describe('public API exports', () => {
+    const tp = {
+        maxTextLength: 4096,
+        safeTextBudget: 100,
+        supportsPlainText: true,
+        supportsMultipartPlainText: true,
+        supportsRichHtml: true,
+        countMethod: 'string-length',
+    };
+
+    it('planDelivery is exported and works', () => {
+        const result = planDelivery({
+            markdown: 'Hello **world**',
+            preferredMode: 'auto',
+            strategy: 'preserve',
+            transport: tp,
+        });
+        assert.ok(result.chunks.length >= 1);
+        assert.ok(result.diagnostics);
+    });
+
+    it('replanTail is exported and works', () => {
+        const original = planDelivery({
+            markdown: 'First\n\nSecond',
+            preferredMode: 'auto',
+            strategy: 'preserve',
+            transport: { ...tp, safeTextBudget: 10 },
+        });
+        const tail = replanTail({
+            markdown: 'First\n\nSecond',
+            previousPlan: original,
+            failedChunkIndex: 0,
+            preferredMode: 'auto',
+            nextStrategy: 'preserve',
+            transport: { ...tp, safeTextBudget: 10 },
+            rejectReason: 'too-long',
+        });
+        assert.ok(tail.chunks.length >= 1);
+        assert.ok(tail.diagnostics);
     });
 });
