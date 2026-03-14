@@ -1,0 +1,8 @@
+src/
+test/
+*.map
+*.ts
+!dist/
+.DS_Store
+*.log
+

@@ -1,0 +1,17 @@
+{
+  "name": "message-chunker-monorepo",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "author": "",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test",
+    "test:pkg": "node --test packages/message-chunker/test/*.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
+
