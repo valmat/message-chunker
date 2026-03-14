@@ -56,6 +56,9 @@ export function replanTail(request) {
     const tailBlocks = fullIr.children.slice(tailBlockIndex);
 
     if (tailBlocks.length === 0) {
+        const resolvedMode = preferredMode === 'plain-text' || !transport.supportsRichHtml
+            ? 'plain-text'
+            : 'rich-html';
         return {
             chunks: [],
             diagnostics: {
@@ -66,7 +69,7 @@ export function replanTail(request) {
                 requestedStrategy: nextStrategy,
                 usedStrategy: nextStrategy,
                 requestedMode: preferredMode,
-                usedMode: preferredMode === 'plain-text' ? 'plain-text' : 'rich-html',
+                usedMode: resolvedMode,
                 hadDegradation: false,
                 degradedToPlainText: false,
                 splitBlockTypes: [],
