@@ -48,16 +48,16 @@
 - [x] Тесты экспорта через index.js
 - [x] README с описанием модуля, API, примерами и ограничениями
 
-## Стадия 8: Финальное ревью — исправления и документация ограничений
+## Стадия 8: Финальное ревью — исторический контекст
 - [x] splitInlineOnce() — максимально плотное заполнение чанка (partial text node)
-- [x] Убран class="language-..." из rich-html code block (safe subset)
-- [x] Валидация rejectReason в replanTail()
-- [ ] Рефакторинг SourceRange для точного адресования внутри split-блоков → [docs/refactoring-sourcerange.md](docs/refactoring-sourcerange.md)
+- [x] Исторически: `class="language-*"` был убран из rich-html code block; позже RFC был обновлён, и теперь это поведение нужно вернуть на следующей итерации
+- [x] Исторически: в `replanTail()` была добавлена runtime-валидация `rejectReason`; после обновления RFC контракт нужно заново синхронизировать
 - [x] Задокументированы осознанные ограничения v1 → [docs/known-limitations.md](docs/known-limitations.md)
 
-## Стадия 9: Открытые вопросы после ревью RFC
+## Стадия 9: Актуальные задачи следующей итерации
+_Читайте в первую очередь: именно этот раздел и блок **Handoff** ниже являются актуальным планом разработки._
 - [ ] Исправить `SourceRange`/`replanTail()` так, чтобы reject внутри split-блока не переотправлял уже доставленный префикс → [docs/refactoring-sourcerange.md](docs/refactoring-sourcerange.md)
-- [ ] Синхронизировать контракт `rejectReason` с обновлённым RFC: для модуля каноничны только `too-long` и `invalid-markup`; транспортные ошибки вне этой классификации остаются за интеграцией
+- [ ] Синхронизировать контракт `rejectReason` с обновлённым RFC: для модуля каноничны только `too-long` и `invalid-markup`; transport-level ошибки и policy после reject остаются за интеграцией
 - [ ] Синхронизировать реализацию rich-html code block с обновлённым RFC: разрешён `class="language-*"` для сохранения language info fenced block
 - [x] Зафиксировать, что `hadDegradation` для unsupported markdown не является обязательным требованием v1; допустимы документация и логирование как nice-to-have
 - [ ] Синхронизировать валидацию `TransportProfile` с обновлённым RFC: `safeTextBudget < 200` должен считаться invalid profile
@@ -66,7 +66,7 @@
 ## Handoff: порядок следующей итерации
 
 ### Шаг 1. Сначала принять проектные решения
-- [ ] Зафиксировать каноническую product policy для `too-long`: уменьшать budget сначала или сразу эскалировать strategy (RFC это пока намеренно не навязывает)
+- [x] Зафиксировано: policy после reject определяется клиентом; библиотека предоставляет ручки (`preferredMode`, `nextStrategy`, `transport.safeTextBudget`, diagnostics), но не хардкодит orchestration
 - [x] Зафиксировано: модуль различает только `too-long` и `invalid-markup`; прочие transport-level ошибки остаются вне спецификации модуля
 - [x] Зафиксировано: unreasonable budgets не поддерживаются; в RFC введён минимальный `safeTextBudget` для v1
 - [x] Зафиксировано: для unsupported markdown достаточно документации/логирования; обязательной продуктовой реакции в v1 не требуется
@@ -84,4 +84,5 @@
 ### Definition of done для следующей итерации
 - [ ] Все open вопросы из Стадии 9 либо закрыты решением, либо явно перенесены в следующий milestone с обновлённым RFC/документацией
 - [ ] RFC, README, typedef и runtime-валидация не противоречат друг другу
+- [ ] Клиентская ответственность за orchestration после reject явно сохранена и не размыта кодом библиотеки
 - [ ] Есть тест, который воспроизводит intra-block reject и подтверждает отсутствие повторной отправки уже доставленного текста

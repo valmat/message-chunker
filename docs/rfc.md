@@ -940,20 +940,24 @@ The tail is restored not from a substring of markdown, but from the normalized I
 
 replanTail() in v1 must escalate strategies itself the same way as planDelivery(): starting from the passed nextStrategy, it sequentially goes by the same normative ladder up to forced-plain-text until a valid tail plan is built.
 
+Important architectural note for v1: the module provides the knobs for replanning (`preferredMode`, `nextStrategy`, `transport.safeTextBudget`, diagnostics), but does not hardcode the integration policy of what exactly should be changed after a reject. The choice of whether to lower the budget, raise the strategy, switch to plain text, or not use replanning at all belongs to the client / integration layer.
+
 ### 18.4. Semantics
+
+The concrete reaction policy after reject is defined by the client / integration layer, not by the library.
+
+Typical usage scenarios in v1:
 
 - for too-long the caller usually:
   - passes the same preferredMode as used before;
-  - rebuilds the tail more aggressively from the point of view of delivery constraints.
-
-  In v1 this RFC intentionally does not fix one mandatory order between:
-  - lowering the budget first and escalating the strategy later;
-  - escalating the strategy first without changing the budget.
-
-  This choice is left to the integration / product policy.
+  - either lowers the budget,
+  - or raises the strategy,
+  - or combines both.
 - for invalid-markup the caller usually:
   - passes preferredMode: 'plain-text';
   - if needed, raises the strategy.
+
+These are recommended scenarios of use, not a requirement that the library itself hardcodes one mandatory reaction order.
 
 Semantics of preferredMode for replanTail() matches planDelivery():
 
@@ -1108,6 +1112,7 @@ The external integration layer is responsible for:
 - sequential sending of chunks;
 - handling transport errors that are not reduced to `too-long` or `invalid-markup`;
 - classifying a transport failure into a module-level replanning reason or deciding that replanning is not applicable;
+- deciding what to change after reject: budget, strategy, preferred mode, retry policy, or no replanning at all;
 - choosing the next strategy;
 - reducing the budget;
 - retry orchestration;
@@ -1176,6 +1181,8 @@ The following features are not in the current scope, but may appear later:
 
 - split-code-lines;
 - simplify-formatting;
+- streaming / iterator-based planning API in addition to `chunks[]`;
+- richer client-facing orchestration helpers built on top of the basic v1 contract.
 - more precise Unicode-aware split up to grapheme cluster level;
 - alternative count methods;
 - renderer to Telegram entities;
