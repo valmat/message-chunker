@@ -39,9 +39,9 @@
 - [x] Тесты replanning (17 тестов)
 
 ## Стадия 6: Комплексные тесты
-- [ ] Golden tests
-- [ ] Property-like тесты (инварианты: бюджет, детерминизм, полнота текста)
-- [ ] Nasty cases (giant paragraph, giant code block, super long line, emoji/ZWJ, nested lists, и т.д.)
+- [x] Golden tests (4 теста)
+- [x] Property-like тесты: бюджет, always-returns, forced-plain-text, replan prefix, text preservation (33 теста)
+- [x] Nasty cases: giant paragraph, giant code block, long line without spaces, giant URL, giant inline code, broken markdown, raw HTML, emoji/ZWJ/combining, nested lists, quote+code+link, reject mid-sequence (26 тестов)
 
 ## Стадия 7: Публичный API и документация
 - [ ] Экспорт публичного API (planDelivery, replanTail, типы)
