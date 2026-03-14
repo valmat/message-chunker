@@ -61,3 +61,26 @@
 - [ ] Синхронизировать реализацию rich-html code block с обновлённым RFC: разрешён `class="language-*"` для сохранения language info fenced block
 - [ ] Явно определить политику для `hadDegradation` при unsupported markdown: либо реализовать сигнал из normalizer, либо зафиксировать это как сознательное отклонение от RFC
 - [ ] Решить policy для экстремально маленького бюджета у code block: либо оставить текущий аварийный fallback как documented limitation, либо скорректировать RFC под фактическое поведение
+
+
+## Handoff: порядок следующей итерации
+
+### Шаг 1. Сначала принять проектные решения
+- [ ] Принять решение по `rejectReason`: канонизируем RFC-термины (`too-long`, `invalid-markup`, `transport-reject`) или переносим проект на новые термины; после решения синхронизировать RFC, typedef, README и runtime-валидацию
+- [ ] Принять решение по tiny-budget `code_block`: это допустимое documented limitation v1 или RFC должен разрешить аварийный raw-text fallback
+- [ ] Подтвердить, что `hadDegradation` для unsupported markdown остаётся limitation v1, а не обязательная задача ближайшей итерации
+
+### Шаг 2. Затем выполнить обязательную синхронизацию RFC → код
+- [ ] Вернуть поддержку rich-html fenced code block с language info согласно обновлённому RFC (`<pre><code class="language-LANG">...</code></pre>`)
+- [ ] Обновить/добавить тесты на rich-html code block с language info
+- [ ] Обновить README и примеры, если там описан safe subset без language metadata
+
+### Шаг 3. Затем сделать критичную функциональную доработку
+- [ ] Реализовать точный `SourceRange` для split-fragments по плану из `docs/refactoring-sourcerange.md`
+- [ ] Научить `replanTail()` восстанавливать хвост по полному `path` + `offsetUtf16`, а не только по `path[0]`
+- [ ] Добавить регрессионные тесты: reject во 2-м чанке длинного paragraph/list item/quote/code block не должен дублировать уже доставленный префикс
+
+### Definition of done для следующей итерации
+- [ ] Все open вопросы из Стадии 9 либо закрыты решением, либо явно перенесены в следующий milestone с обновлённым RFC/документацией
+- [ ] RFC, README, typedef и runtime-валидация не противоречат друг другу
+- [ ] Есть тест, который воспроизводит intra-block reject и подтверждает отсутствие повторной отправки уже доставленного текста

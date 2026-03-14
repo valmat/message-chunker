@@ -110,3 +110,11 @@ replanTail() начинает хвост снова с path[0] = 0,
 Высокая.
 
 Это не локальная правка, а изменение модели адресации внутри planner/replan pipeline. Делать как отдельную задачу после согласования минимального дизайна `sourceRange` для split-fragments.
+
+
+## Acceptance criteria
+
+- у разных fragment одного split-блока разные `sourceRange`;
+- `sourceRange.start` указывает на реальное место начала fragment внутри IR, а не только на top-level блок;
+- `replanTail()` после reject внутри split-блока не включает в tail уже доставленный текст;
+- добавлены regression tests минимум для paragraph и list item; желательно также для quote и code block.
