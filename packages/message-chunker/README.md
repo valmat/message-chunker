@@ -7,7 +7,7 @@ Safe preparation module for splitting long rich-text (Markdown) messages for del
 ## Features
 
 - Markdown parsing via markdown-it, normalization to a compact IR
-- Two rendering modes: **rich-html** (safe subset: `<b>`, `<i>`, `<code>`, `<pre>`, `<a>`) and **plain-text**
+- Two rendering modes: **rich-html** (safe subset: `<b>`, `<i>`, `<code>`, `<pre>`, `<a>`; code blocks preserve language info via `class="language-*"`) and **plain-text**
 - 5-level strategy escalation: `preserve → split-blocks → split-blocks-soft → plain-text → forced-plain-text`
 - Greedy packing (maximal prefix per chunk)
 - Unicode-safe splitting (never breaks surrogate pairs)
@@ -69,7 +69,7 @@ const tail = replanTail({
     preferredMode: 'auto',
     nextStrategy: nextStrategy(plan.diagnostics.usedStrategy) || 'forced-plain-text',
     transport,
-    rejectReason: 'too-long',     // 'too-long' | 'format-rejected'
+    rejectReason: 'too-long',     // 'too-long' | 'invalid-markup'
 });
 
 // tail.chunks has fresh indices 0..M-1
@@ -118,7 +118,7 @@ Replan the undelivered tail after a transport reject.
 | Field | Type | Description |
 |---|---|---|
 | `maxTextLength` | `number` | Hard transport limit |
-| `safeTextBudget` | `number` | Safe budget (must not exceed `maxTextLength`) |
+| `safeTextBudget` | `number` | Safe budget (>= 200, must not exceed `maxTextLength`) |
 | `supportsPlainText` | `boolean` | Transport accepts plain text |
 | `supportsMultipartPlainText` | `boolean` | Transport accepts multiple plain-text messages |
 | `supportsRichHtml` | `boolean` | Transport accepts rich HTML |
@@ -140,6 +140,48 @@ Replan the undelivered tail after a transport reject.
 | `split-blocks-soft` | Split within blocks (sentences, punctuation) |
 | `plain-text` | Same as split-blocks-soft but in plain-text mode |
 | `forced-plain-text` | Last resort: split at `\n\n` → `\n` → whitespace → Unicode-safe forced cut |
+
+## Reject handling scenarios
+
+The library provides replanning tools but does **not** hardcode the retry policy — that is the caller's responsibility.
+
+### `too-long` — chunk exceeded the transport limit
+
+Typical caller reaction: lower the budget, raise the strategy, or both.
+
+```js
+// Transport rejected chunk 1 as too long → lower budget and escalate strategy
+const tail = replanTail({
+    markdown,
+    previousPlan: plan,
+    failedChunkIndex: 1,
+    preferredMode: 'auto',
+    nextStrategy: nextStrategy(plan.diagnostics.usedStrategy) || 'forced-plain-text',
+    transport: { ...transport, safeTextBudget: transport.safeTextBudget - 400 },
+    rejectReason: 'too-long',
+});
+```
+
+### `invalid-markup` — transport rejected the markup
+
+Typical caller reaction: switch to plain-text mode for the remaining tail.
+
+```js
+// Transport rejected rich-html chunk → replan tail as plain-text
+const tail = replanTail({
+    markdown,
+    previousPlan: plan,
+    failedChunkIndex: 2,
+    preferredMode: 'plain-text',
+    nextStrategy: plan.diagnostics.usedStrategy,
+    transport,
+    rejectReason: 'invalid-markup',
+});
+```
+
+### Other transport errors (401, 429, 5xx, network failures)
+
+These are **not** module-level reject reasons. The integration layer must decide whether to retry sending, abort, or map the error to `too-long` / `invalid-markup` before calling `replanTail()`.
 
 ## Limitations
 

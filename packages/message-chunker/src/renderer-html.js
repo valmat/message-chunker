@@ -57,6 +57,9 @@ function renderQuoteHtml(block) {
 
 function renderCodeBlockHtml(block) {
     const escaped = escapeHtml(block.value);
+    if (block.lang) {
+        return '<pre><code class="language-' + escapeHtml(block.lang) + '">' + escaped + '</code></pre>';
+    }
     return '<pre>' + escaped + '</pre>';
 }
 

@@ -15,7 +15,7 @@
  */
 
 /**
- * @typedef {'too-long' | 'invalid-markup' | 'transport-reject'} RejectReason
+ * @typedef {'too-long' | 'invalid-markup'} RejectReason
  */
 
 /**
@@ -186,6 +186,9 @@ export function validateTransportProfile(tp) {
     }
     if (typeof tp.safeTextBudget !== 'number' || tp.safeTextBudget <= 0) {
         throw new Error('TransportProfile.safeTextBudget must be a positive number');
+    }
+    if (tp.safeTextBudget < 200) {
+        throw new Error('TransportProfile.safeTextBudget must be at least 200 (RFC v1 minimum)');
     }
     if (tp.safeTextBudget > tp.maxTextLength) {
         throw new Error('TransportProfile.safeTextBudget must not exceed maxTextLength');

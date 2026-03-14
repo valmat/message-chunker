@@ -36,7 +36,7 @@ export function replanTail(request) {
 
     validateTransportProfile(transport);
 
-    const VALID_REJECT_REASONS = ['too-long', 'format-rejected'];
+    const VALID_REJECT_REASONS = ['too-long', 'invalid-markup'];
     if (rejectReason && !VALID_REJECT_REASONS.includes(rejectReason)) {
         throw new Error(`Unknown rejectReason: ${rejectReason}. Valid values: ${VALID_REJECT_REASONS.join(', ')}`);
     }
