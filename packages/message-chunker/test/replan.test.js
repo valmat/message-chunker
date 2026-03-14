@@ -361,9 +361,9 @@ describe('replanTail — validation', () => {
     });
 });
 
-// =============== delivered prefix not resent ===============
+// =============== delivered prefix not resent (inter-block) ===============
 
-describe('replanTail — delivered prefix not resent', () => {
+describe('replanTail — delivered prefix not resent (inter-block)', () => {
     it('tail does not contain content from delivered chunks', () => {
         const md = 'AAAA'.repeat(40) + '\n\n' + 'BBBB'.repeat(40) + '\n\n' + 'CCCC'.repeat(40);
         const original = plan(md, { transport: { safeTextBudget: 200 } });
@@ -384,3 +384,166 @@ describe('replanTail — delivered prefix not resent', () => {
         }
     });
 });
+
+// =============== intra-block reject: no prefix duplication ===============
+
+describe('replanTail — intra-block reject: paragraph', () => {
+    it('reject in 2nd chunk of split paragraph does not re-send delivered prefix', () => {
+        // Single long paragraph with unique words to avoid false positive on includes()
+        const words = Array.from({ length: 200 }, (_, i) => `w${i}`);
+        const md = words.join(' '); // ~1000+ chars of unique text
+        const budget = 250;
+        const original = plan(md, {
+            transport: { safeTextBudget: budget },
+        });
+
+        // Must have at least 3 chunks (single paragraph split)
+        assert.ok(original.chunks.length >= 3,
+            `expected >= 3 chunks for split paragraph, got ${original.chunks.length}`);
+
+        // chunk 0 is delivered, chunk 1 is rejected
+        const delivered = original.chunks[0].content;
+        const tail = replan(md, original, 1, {
+            transport: { safeTextBudget: budget },
+        });
+
+        assert.ok(tail.chunks.length >= 1, 'tail should have at least 1 chunk');
+
+        // The tail must not contain the delivered prefix
+        const tailFull = tail.chunks.map(c => c.content).join('');
+        assert.ok(!tailFull.includes(delivered),
+            'tail should not contain the already-delivered first chunk content');
+
+        // Budget invariant
+        for (const chunk of tail.chunks) {
+            assert.ok(chunk.content.length <= budget,
+                `tail chunk exceeds budget: ${chunk.content.length} > ${budget}`);
+        }
+    });
+
+    it('intra-block sourceRange.start differs between split fragments', () => {
+        const md = 'Sentence here. '.repeat(80); // ~1200 chars
+        const budget = 250;
+        const original = plan(md, {
+            transport: { safeTextBudget: budget },
+        });
+
+        assert.ok(original.chunks.length >= 3,
+            `expected >= 3 chunks, got ${original.chunks.length}`);
+
+        // All chunks come from block 0 (single paragraph), but should have different cursors
+        const starts = original.chunks.map(c => c.sourceRange.start);
+        for (let i = 1; i < starts.length; i++) {
+            const prev = starts[i - 1];
+            const curr = starts[i];
+            // Either path differs or offset differs
+            const same = pathAndOffsetEqual(prev, curr);
+            assert.ok(!same,
+                `chunk ${i - 1} and ${i} have identical sourceRange.start: ` +
+                `path=${JSON.stringify(curr.path)} offset=${curr.offsetUtf16}`);
+        }
+    });
+});
+
+describe('replanTail — intra-block reject: list item', () => {
+    it('reject in 2nd chunk of split list item does not re-send delivered prefix', () => {
+        // Single list item with very long text
+        const longItem = '- ' + 'ListWord. '.repeat(120); // ~1200 chars in one item
+        const md = longItem + '\n- Short item';
+        const budget = 250;
+        const original = plan(md, {
+            transport: { safeTextBudget: budget },
+        });
+
+        // Find chunks from the long first list item
+        assert.ok(original.chunks.length >= 3,
+            `expected >= 3 chunks, got ${original.chunks.length}`);
+
+        const delivered = original.chunks[0].content;
+        const tail = replan(md, original, 1, {
+            transport: { safeTextBudget: budget },
+        });
+
+        assert.ok(tail.chunks.length >= 1);
+
+        const tailFull = tail.chunks.map(c => c.content).join('');
+        assert.ok(!tailFull.includes(delivered),
+            'tail should not contain the already-delivered list item prefix');
+
+        for (const chunk of tail.chunks) {
+            assert.ok(chunk.content.length <= budget,
+                `tail chunk exceeds budget: ${chunk.content.length} > ${budget}`);
+        }
+    });
+});
+
+describe('replanTail — intra-block reject: quote', () => {
+    it('reject in 2nd chunk of split quote does not re-send delivered prefix', () => {
+        // Long quote that must be split
+        const md = '> ' + 'QuoteWord. '.repeat(120); // ~1320 chars in one quote
+        const budget = 250;
+        const original = plan(md, {
+            transport: { safeTextBudget: budget },
+        });
+
+        assert.ok(original.chunks.length >= 3,
+            `expected >= 3 chunks, got ${original.chunks.length}`);
+
+        const delivered = original.chunks[0].content;
+        const tail = replan(md, original, 1, {
+            transport: { safeTextBudget: budget },
+        });
+
+        assert.ok(tail.chunks.length >= 1);
+
+        const tailFull = tail.chunks.map(c => c.content).join('');
+        assert.ok(!tailFull.includes(delivered),
+            'tail should not contain the already-delivered quote prefix');
+
+        for (const chunk of tail.chunks) {
+            assert.ok(chunk.content.length <= budget,
+                `tail chunk exceeds budget: ${chunk.content.length} > ${budget}`);
+        }
+    });
+});
+
+describe('replanTail — intra-block reject: code block', () => {
+    it('reject in 2nd chunk of split code block does not re-send delivered prefix', () => {
+        // Long code block
+        const codeLines = Array.from({ length: 60 }, (_, i) => `const x${i} = ${i};`).join('\n');
+        const md = '```js\n' + codeLines + '\n```';
+        const budget = 250;
+        const original = plan(md, {
+            transport: { safeTextBudget: budget },
+        });
+
+        assert.ok(original.chunks.length >= 3,
+            `expected >= 3 chunks for split code block, got ${original.chunks.length}`);
+
+        const delivered = original.chunks[0].content;
+        const tail = replan(md, original, 1, {
+            transport: { safeTextBudget: budget },
+        });
+
+        assert.ok(tail.chunks.length >= 1);
+
+        const tailFull = tail.chunks.map(c => c.content).join('');
+        assert.ok(!tailFull.includes(delivered),
+            'tail should not contain the already-delivered code block prefix');
+
+        for (const chunk of tail.chunks) {
+            assert.ok(chunk.content.length <= budget,
+                `tail chunk exceeds budget: ${chunk.content.length} > ${budget}`);
+        }
+    });
+});
+
+// Helper: compare cursor path+offset
+function pathAndOffsetEqual(a, b) {
+    if (a.offsetUtf16 !== b.offsetUtf16) return false;
+    if (a.path.length !== b.path.length) return false;
+    for (let i = 0; i < a.path.length; i++) {
+        if (a.path[i] !== b.path[i]) return false;
+    }
+    return true;
+}

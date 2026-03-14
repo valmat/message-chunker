@@ -69,10 +69,10 @@ _Источник истины до синхронизации кода: `docs/r
 - [x] Обновить/добавить тесты на rich-html code block с language info
 
 ### Шаг 3. Затем сделать критичную функциональную доработку
-- [ ] Исправить `SourceRange`/`replanTail()` так, чтобы reject внутри split-блока не переотправлял уже доставленный префикс → [docs/refactoring-sourcerange.md](docs/refactoring-sourcerange.md)
-- [ ] Реализовать точный `SourceRange` для split-fragments по плану из `docs/refactoring-sourcerange.md`
-- [ ] Научить `replanTail()` восстанавливать хвост по полному `path` + `offsetUtf16`, а не только по `path[0]`
-- [ ] Добавить регрессионные тесты: reject во 2-м чанке длинного paragraph/list item/quote/code block не должен дублировать уже доставленный префикс
+- [x] Исправить `SourceRange`/`replanTail()` так, чтобы reject внутри split-блока не переотправлял уже доставленный префикс → [docs/refactoring-sourcerange.md](docs/refactoring-sourcerange.md)
+- [x] Реализовать точный `SourceRange` для split-fragments по плану из `docs/refactoring-sourcerange.md`
+- [x] Научить `replanTail()` восстанавливать хвост по полному `path` + `offsetUtf16`, а не только по `path[0]`
+- [x] Добавить регрессионные тесты: reject во 2-м чанке длинного paragraph/list item/quote/code block не должен дублировать уже доставленный префикс
 
 ### Уже зафиксированные решения — не переоткрывать без явной причины
 - [x] Policy после reject определяется клиентом; библиотека предоставляет ручки (`preferredMode`, `nextStrategy`, `transport.safeTextBudget`, diagnostics), но не хардкодит orchestration
@@ -82,7 +82,7 @@ _Источник истины до синхронизации кода: `docs/r
 - [x] Iterator / streaming API — возможное расширение после v1, не задача текущей итерации
 
 ### Definition of done для следующей итерации
-- [ ] RFC, README, typedef, runtime-валидация и тесты не противоречат друг другу
-- [ ] Клиентская ответственность за orchestration после reject явно сохранена и не размыта кодом библиотеки
-- [ ] Есть тест, который воспроизводит intra-block reject и подтверждает отсутствие повторной отправки уже доставленного текста
-- [ ] README содержит не только API-описание, но и сценарии использования для типовых reject-потоков
+- [x] RFC, README, typedef, runtime-валидация и тесты не противоречат друг другу
+- [x] Клиентская ответственность за orchestration после reject явно сохранена и не размыта кодом библиотеки
+- [x] Есть тест, который воспроизводит intra-block reject и подтверждает отсутствие повторной отправки уже доставленного текста
+- [x] README содержит не только API-описание, но и сценарии использования для типовых reject-потоков

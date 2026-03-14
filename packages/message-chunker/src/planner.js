@@ -156,6 +156,7 @@ function trySplitBlocksSoft(ir, mode, budget) {
     let currentContent = '';
     let currentBlockStart = 0;
     let currentBlockEnd = -1;
+    let currentSourceStart = null; // precise start cursor for split fragment tail
     const splitBlockTypes = new Set();
 
     function flushCurrent() {
@@ -165,9 +166,11 @@ function trySplitBlocksSoft(ir, mode, budget) {
                 mode,
                 blockStart: currentBlockStart,
                 blockEnd: currentBlockEnd,
+                sourceStart: currentSourceStart,
             });
             currentContent = '';
             currentBlockEnd = -1;
+            currentSourceStart = null;
         }
     }
 
@@ -199,22 +202,27 @@ function trySplitBlocksSoft(ir, mode, budget) {
         if (!canSplitBlock(block, mode)) return null;
 
         splitBlockTypes.add(block.type);
-        const parts = splitBlockIntoParts(block, budget, mode);
-        if (!parts) return null;
+        const fragments = splitBlockIntoFragments(block, budget, mode);
+        if (!fragments) return null;
 
-        // All parts except the last become their own chunks
-        for (let p = 0; p < parts.length - 1; p++) {
+        // All fragments except the last become their own chunks
+        for (let p = 0; p < fragments.length - 1; p++) {
+            const frag = fragments[p];
             chunkData.push({
-                content: parts[p],
+                content: frag.content,
                 mode,
                 blockStart: i,
                 blockEnd: i,
+                sourceStart: prependBlockIdx(frag.cursorStart, i),
+                sourceEnd: prependBlockIdx(frag.cursorEnd, i),
             });
         }
-        // Last part becomes current (may merge with next block)
+        // Last fragment becomes current (may merge with next block)
+        const lastFrag = fragments[fragments.length - 1];
         currentBlockStart = i;
         currentBlockEnd = i;
-        currentContent = parts[parts.length - 1];
+        currentContent = lastFrag.content;
+        currentSourceStart = prependBlockIdx(lastFrag.cursorStart, i);
     }
 
     flushCurrent();
@@ -232,21 +240,22 @@ function canSplitBlock(block, mode) {
 }
 
 /**
- * Split an oversized block into parts that each fit the budget.
- * Returns array of rendered strings, or null if can't split.
+ * Split an oversized block into fragments with cursor metadata.
+ * Returns array of { content, cursorStart, cursorEnd } where cursor paths
+ * are relative to the block (not including the block's own index).
  */
-function splitBlockIntoParts(block, budget, mode) {
+function splitBlockIntoFragments(block, budget, mode) {
     switch (block.type) {
         case 'paragraph':
-            return splitParagraphIntoParts(block, budget, mode);
+            return splitParagraphIntoFragments(block, budget, mode);
         case 'quote':
-            return splitQuoteIntoParts(block, budget, mode);
+            return splitQuoteIntoFragments(block, budget, mode);
         case 'list':
-            return splitListIntoParts(block, budget, mode);
+            return splitListIntoFragments(block, budget, mode);
         case 'list_item':
-            return splitListItemIntoParts(block, budget, mode);
+            return splitListItemIntoFragments(block, budget, mode);
         case 'code_block':
-            return splitCodeBlockIntoParts(block, budget);
+            return splitCodeBlockIntoFragments(block, budget);
         default:
             return null;
     }
@@ -254,25 +263,42 @@ function splitBlockIntoParts(block, budget, mode) {
 
 // --------------- paragraph splitting ---------------
 
-function splitParagraphIntoParts(paragraph, budget, mode) {
+function splitParagraphIntoFragments(paragraph, budget, mode) {
     const children = paragraph.children;
-    const parts = [];
+    const fragments = [];
     let remaining = children;
+    let textOffset = 0;
 
     while (remaining.length > 0) {
         const rendered = renderInline(remaining, mode);
         if (rendered.length <= budget) {
-            parts.push(rendered);
+            const textLen = inlineTextLength(remaining);
+            fragments.push({
+                content: rendered,
+                cursorStart: inlineOffsetToCursor(children, textOffset, false),
+                cursorEnd: inlineOffsetToCursor(children, textOffset + textLen, true),
+            });
             break;
         }
 
+        const prevLen = inlineTextLength(remaining);
         const split = splitInlineOnce(remaining, budget, mode);
         if (!split) return null;
-        parts.push(split.firstContent);
+
+        const afterLen = inlineTextLength(split.restChildren);
+        const consumed = prevLen - afterLen;
+
+        fragments.push({
+            content: split.firstContent,
+            cursorStart: inlineOffsetToCursor(children, textOffset, false),
+            cursorEnd: inlineOffsetToCursor(children, textOffset + consumed, true),
+        });
+
+        textOffset += consumed;
         remaining = split.restChildren;
     }
 
-    return parts;
+    return fragments.length > 0 ? fragments : null;
 }
 
 /**
@@ -383,11 +409,11 @@ function splitTextNode(textValue, budget, mode) {
 
 // --------------- quote splitting ---------------
 
-function splitQuoteIntoParts(quote, budget, mode) {
-    // Try splitting by inner blocks
+function splitQuoteIntoFragments(quote, budget, mode) {
     const innerBlocks = quote.children;
-    const parts = [];
+    const fragments = [];
     let currentBlocks = [];
+    let currentStartInnerIdx = 0;
 
     for (let i = 0; i < innerBlocks.length; i++) {
         currentBlocks.push(innerBlocks[i]);
@@ -399,24 +425,24 @@ function splitQuoteIntoParts(quote, budget, mode) {
                 // Back up: flush previous blocks
                 currentBlocks.pop();
                 const flushQuote = { type: 'quote', children: [...currentBlocks] };
-                parts.push(renderBlocks([flushQuote], mode));
+                fragments.push({
+                    content: renderBlocks([flushQuote], mode),
+                    cursorStart: findFirstLeafCursorRel(quote, [currentStartInnerIdx]),
+                    cursorEnd: findLastLeafCursorRel(quote, [i - 1]),
+                });
                 currentBlocks = [innerBlocks[i]];
+                currentStartInnerIdx = i;
 
                 // Check if single inner block fits
                 const singleQuote = { type: 'quote', children: [innerBlocks[i]] };
                 const singleRendered = renderBlocks([singleQuote], mode);
                 if (singleRendered.length > budget) {
-                    // Try splitting the inner block (if paragraph)
                     if (innerBlocks[i].type === 'paragraph') {
-                        const subParts = splitParagraphForQuote(innerBlocks[i], budget, mode);
-                        if (!subParts) return null;
-                        for (const sp of subParts.slice(0, -1)) parts.push(sp);
-                        currentBlocks = []; // Will be set from last subpart below
-                        // Reconstruct last part as a paragraph in a quote
-                        // Actually, subParts are already rendered strings with quote prefix
-                        // Push last one and start fresh
-                        parts.push(subParts[subParts.length - 1]);
+                        const subFrags = splitParagraphForQuoteFragments(innerBlocks[i], budget, mode, i);
+                        if (!subFrags) return null;
+                        for (const sf of subFrags) fragments.push(sf);
                         currentBlocks = [];
+                        currentStartInnerIdx = i + 1;
                     } else {
                         return null;
                     }
@@ -424,11 +450,11 @@ function splitQuoteIntoParts(quote, budget, mode) {
             } else {
                 // Single inner block too large
                 if (innerBlocks[i].type === 'paragraph') {
-                    const subParts = splitParagraphForQuote(innerBlocks[i], budget, mode);
-                    if (!subParts) return null;
-                    for (const sp of subParts.slice(0, -1)) parts.push(sp);
-                    parts.push(subParts[subParts.length - 1]);
+                    const subFrags = splitParagraphForQuoteFragments(innerBlocks[i], budget, mode, i);
+                    if (!subFrags) return null;
+                    for (const sf of subFrags) fragments.push(sf);
                     currentBlocks = [];
+                    currentStartInnerIdx = i + 1;
                 } else {
                     return null;
                 }
@@ -438,29 +464,37 @@ function splitQuoteIntoParts(quote, budget, mode) {
 
     if (currentBlocks.length > 0) {
         const q = { type: 'quote', children: currentBlocks };
-        parts.push(renderBlocks([q], mode));
+        fragments.push({
+            content: renderBlocks([q], mode),
+            cursorStart: findFirstLeafCursorRel(quote, [currentStartInnerIdx]),
+            cursorEnd: findLastLeafCursorRel(quote, [innerBlocks.length - 1]),
+        });
     }
 
-    return parts.length > 0 ? parts : null;
+    return fragments.length > 0 ? fragments : null;
 }
 
-function splitParagraphForQuote(paragraph, budget, mode) {
-    // Each part becomes a paragraph inside a quote
+function splitParagraphForQuoteFragments(paragraph, budget, mode, innerBlockIdx) {
     const prefix = mode === 'rich-html' ? '&gt; ' : '> ';
     const innerBudget = budget - prefix.length;
     if (innerBudget <= 0) return null;
 
-    const paraParts = splitParagraphIntoParts(paragraph, innerBudget, mode);
-    if (!paraParts) return null;
+    const paraFragments = splitParagraphIntoFragments(paragraph, innerBudget, mode);
+    if (!paraFragments) return null;
 
-    return paraParts.map(content => prefix + content);
+    return paraFragments.map(frag => ({
+        content: prefix + frag.content,
+        cursorStart: { path: [innerBlockIdx, ...frag.cursorStart.path], offsetUtf16: frag.cursorStart.offsetUtf16 },
+        cursorEnd: { path: [innerBlockIdx, ...frag.cursorEnd.path], offsetUtf16: frag.cursorEnd.offsetUtf16 },
+    }));
 }
 
 // --------------- list splitting ---------------
 
-function splitListIntoParts(list, budget, mode) {
-    const parts = [];
+function splitListIntoFragments(list, budget, mode) {
+    const fragments = [];
     let currentItems = [];
+    let currentStartItemIdx = 0;
 
     for (let i = 0; i < list.children.length; i++) {
         const item = list.children[i];
@@ -472,38 +506,58 @@ function splitListIntoParts(list, budget, mode) {
             if (currentItems.length > 1) {
                 currentItems.pop();
                 const flushList = { ...list, children: [...currentItems] };
-                parts.push(renderBlocks([flushList], mode));
+                fragments.push({
+                    content: renderBlocks([flushList], mode),
+                    cursorStart: findFirstLeafCursorRel(list, [currentStartItemIdx]),
+                    cursorEnd: findLastLeafCursorRel(list, [i - 1]),
+                });
                 currentItems = [item];
+                currentStartItemIdx = i;
 
                 // Check single item
                 const singleList = { ...list, children: [item] };
                 if (renderBlocks([singleList], mode).length > budget) {
-                    const itemParts = splitListItemIntoParts(item, budget, mode);
-                    if (!itemParts) return null;
-                    for (const ip of itemParts) parts.push(ip);
+                    const itemFrags = splitListItemForListFragments(item, budget, mode, i);
+                    if (!itemFrags) return null;
+                    for (const ifr of itemFrags) fragments.push(ifr);
                     currentItems = [];
+                    currentStartItemIdx = i + 1;
                 }
             } else {
                 // Single item too large
-                const itemParts = splitListItemIntoParts(item, budget, mode);
-                if (!itemParts) return null;
-                for (const ip of itemParts) parts.push(ip);
+                const itemFrags = splitListItemForListFragments(item, budget, mode, i);
+                if (!itemFrags) return null;
+                for (const ifr of itemFrags) fragments.push(ifr);
                 currentItems = [];
+                currentStartItemIdx = i + 1;
             }
         }
     }
 
     if (currentItems.length > 0) {
         const l = { ...list, children: currentItems };
-        parts.push(renderBlocks([l], mode));
+        fragments.push({
+            content: renderBlocks([l], mode),
+            cursorStart: findFirstLeafCursorRel(list, [currentStartItemIdx]),
+            cursorEnd: findLastLeafCursorRel(list, [list.children.length - 1]),
+        });
     }
 
-    return parts.length > 0 ? parts : null;
+    return fragments.length > 0 ? fragments : null;
 }
 
-function splitListItemIntoParts(item, budget, mode) {
-    // List item rendered as: "marker content\n  continuation"
-    // Try splitting inner blocks
+function splitListItemForListFragments(item, budget, mode, itemIdx) {
+    const itemFrags = splitListItemIntoFragments(item, budget, mode);
+    if (!itemFrags) return null;
+    // Prepend itemIdx to each fragment's cursor path
+    return itemFrags.map(frag => ({
+        content: frag.content,
+        cursorStart: { path: [itemIdx, ...frag.cursorStart.path], offsetUtf16: frag.cursorStart.offsetUtf16 },
+        cursorEnd: { path: [itemIdx, ...frag.cursorEnd.path], offsetUtf16: frag.cursorEnd.offsetUtf16 },
+    }));
+}
+
+function splitListItemIntoFragments(item, budget, mode) {
     const marker = (item.marker || '-') + ' ';
     const indent = '  ';
 
@@ -519,26 +573,35 @@ function splitListItemIntoParts(item, budget, mode) {
         if (innerBudget <= 0) return null;
 
         if (item.children[0].type === 'paragraph') {
-            const paraParts = splitParagraphIntoParts(item.children[0], innerBudget, mode);
-            if (!paraParts) return null;
-            const parts = [];
-            for (let p = 0; p < paraParts.length; p++) {
-                parts.push(marker + paraParts[p]);
+            const paraFrags = splitParagraphIntoFragments(item.children[0], innerBudget, mode);
+            if (!paraFrags) return null;
+            const fragments = [];
+            for (let p = 0; p < paraFrags.length; p++) {
+                fragments.push({
+                    content: marker + paraFrags[p].content,
+                    cursorStart: { path: [0, ...paraFrags[p].cursorStart.path], offsetUtf16: paraFrags[p].cursorStart.offsetUtf16 },
+                    cursorEnd: { path: [0, ...paraFrags[p].cursorEnd.path], offsetUtf16: paraFrags[p].cursorEnd.offsetUtf16 },
+                });
             }
             // Remaining inner blocks as continuation
             for (let b = 1; b < item.children.length; b++) {
                 const cont = renderBlocks([item.children[b]], mode);
                 const indented = cont.split('\n').map(l => indent + l).join('\n');
-                parts.push(marker + indented);
+                fragments.push({
+                    content: marker + indented,
+                    cursorStart: findFirstLeafCursorRel(item, [b]),
+                    cursorEnd: findLastLeafCursorRel(item, [b]),
+                });
             }
-            return parts;
+            return fragments;
         }
         return null;
     }
 
     // First block fits with marker; try adding more inner blocks
-    const parts = [];
+    const fragments = [];
     let current = firstLine;
+    let currentStartBlock = 0;
 
     for (let b = 1; b < item.children.length; b++) {
         const cont = renderBlocks([item.children[b]], mode);
@@ -546,20 +609,32 @@ function splitListItemIntoParts(item, budget, mode) {
         const combined = current + '\n' + indented;
 
         if (combined.length > budget) {
-            parts.push(current);
+            fragments.push({
+                content: current,
+                cursorStart: findFirstLeafCursorRel(item, [currentStartBlock]),
+                cursorEnd: findLastLeafCursorRel(item, [b - 1]),
+            });
             current = marker + indented.trimStart();
+            currentStartBlock = b;
         } else {
             current = combined;
         }
     }
 
-    if (current) parts.push(current);
-    return parts.length > 1 ? parts : null;
+    if (current) {
+        fragments.push({
+            content: current,
+            cursorStart: findFirstLeafCursorRel(item, [currentStartBlock]),
+            cursorEnd: findLastLeafCursorRel(item, [item.children.length - 1]),
+        });
+    }
+
+    return fragments.length > 1 ? fragments : null;
 }
 
 // --------------- code block splitting (plain-text only) ---------------
 
-function splitCodeBlockIntoParts(block, budget) {
+function splitCodeBlockIntoFragments(block, budget) {
     const lang = block.lang || '';
     const fenceOpen = '```' + lang + '\n';
     const fenceClose = '\n```';
@@ -568,8 +643,9 @@ function splitCodeBlockIntoParts(block, budget) {
 
     if (contentBudget <= 0) return null;
 
-    const parts = [];
+    const fragments = [];
     let remaining = block.value;
+    let valueOffset = 0;
 
     while (remaining.length > contentBudget) {
         const candidate = remaining.slice(0, contentBudget);
@@ -581,15 +657,26 @@ function splitCodeBlockIntoParts(block, budget) {
             splitPos = unicodeSafeSplit(remaining, contentBudget)[0].length;
         }
 
-        parts.push(fenceOpen + remaining.slice(0, splitPos) + fenceClose);
-        remaining = remaining.slice(splitPos + (remaining[splitPos] === '\n' ? 1 : 0));
+        fragments.push({
+            content: fenceOpen + remaining.slice(0, splitPos) + fenceClose,
+            cursorStart: { path: [], offsetUtf16: valueOffset },
+            cursorEnd: { path: [], offsetUtf16: valueOffset + splitPos },
+        });
+
+        const skip = remaining[splitPos] === '\n' ? 1 : 0;
+        valueOffset += splitPos + skip;
+        remaining = remaining.slice(splitPos + skip);
     }
 
     if (remaining) {
-        parts.push(fenceOpen + remaining + fenceClose);
+        fragments.push({
+            content: fenceOpen + remaining + fenceClose,
+            cursorStart: { path: [], offsetUtf16: valueOffset },
+            cursorEnd: { path: [], offsetUtf16: valueOffset + remaining.length },
+        });
     }
 
-    return parts.length > 0 ? parts : null;
+    return fragments.length > 0 ? fragments : null;
 }
 
 // --------------- forced-plain-text ---------------
@@ -599,6 +686,7 @@ function doForcedPlainText(ir, budget) {
     let currentContent = '';
     let currentBlockStart = 0;
     let currentBlockEnd = -1;
+    let currentSourceStart = null;
     const splitBlockTypes = new Set();
 
     function flushCurrent() {
@@ -608,9 +696,11 @@ function doForcedPlainText(ir, budget) {
                 mode: 'plain-text',
                 blockStart: currentBlockStart,
                 blockEnd: currentBlockEnd,
+                sourceStart: currentSourceStart,
             });
             currentContent = '';
             currentBlockEnd = -1;
+            currentSourceStart = null;
         }
     }
 
@@ -642,24 +732,29 @@ function doForcedPlainText(ir, budget) {
 
             // Split code block with balanced fences
             splitBlockTypes.add('code_block');
-            const codeParts = splitCodeBlockIntoParts(block, budget);
-            if (codeParts) {
-                for (let p = 0; p < codeParts.length - 1; p++) {
+            const codeFrags = splitCodeBlockIntoFragments(block, budget);
+            if (codeFrags) {
+                for (let p = 0; p < codeFrags.length - 1; p++) {
                     chunkData.push({
-                        content: codeParts[p],
+                        content: codeFrags[p].content,
                         mode: 'plain-text',
                         blockStart: i,
                         blockEnd: i,
+                        sourceStart: prependBlockIdx(codeFrags[p].cursorStart, i),
+                        sourceEnd: prependBlockIdx(codeFrags[p].cursorEnd, i),
                     });
                 }
+                const lastFrag = codeFrags[codeFrags.length - 1];
                 currentBlockStart = i;
                 currentBlockEnd = i;
-                currentContent = codeParts[codeParts.length - 1];
+                currentContent = lastFrag.content;
+                currentSourceStart = prependBlockIdx(lastFrag.cursorStart, i);
             } else {
                 // Fallback: split as raw text
                 currentBlockStart = i;
                 currentBlockEnd = i;
                 let rem = blockContent;
+                let renderedOffset = 0;
                 while (rem.length > budget) {
                     const split = splitForcedPlainText(rem, budget);
                     if (!split) break;
@@ -668,10 +763,14 @@ function doForcedPlainText(ir, budget) {
                         mode: 'plain-text',
                         blockStart: i,
                         blockEnd: i,
+                        sourceStart: codeBlockRenderedOffsetToCursor(block, renderedOffset, i),
+                        sourceEnd: codeBlockRenderedOffsetToCursor(block, renderedOffset + split[0].length, i),
                     });
+                    renderedOffset += split[0].length;
                     rem = split[1];
                 }
                 currentContent = rem;
+                currentSourceStart = codeBlockRenderedOffsetToCursor(block, renderedOffset, i);
             }
             continue;
         }
@@ -702,18 +801,28 @@ function doForcedPlainText(ir, budget) {
         currentBlockStart = i;
         currentBlockEnd = i;
         let rem = blockContent;
+        let renderedOffset = 0;
+
         while (rem.length > budget) {
             const split = splitForcedPlainText(rem, budget);
             if (!split) break;
+
+            const srcStart = blockRenderedOffsetToCursor(block, renderedOffset, i);
+            renderedOffset += split[0].length;
+            const srcEnd = blockRenderedOffsetToCursor(block, renderedOffset, i);
+
             chunkData.push({
                 content: split[0],
                 mode: 'plain-text',
                 blockStart: i,
                 blockEnd: i,
+                sourceStart: srcStart,
+                sourceEnd: srcEnd,
             });
             rem = split[1];
         }
         currentContent = rem;
+        currentSourceStart = blockRenderedOffsetToCursor(block, renderedOffset, i);
     }
 
     flushCurrent();
@@ -764,7 +873,247 @@ function greedyPack(renderedBlocks, irBlocks, mode, budget) {
     return chunkData;
 }
 
-// --------------- source range ---------------
+// =============== inline text helpers ===============
+
+/**
+ * Count total text characters in an inline node tree.
+ * Counts text values, inline_code values, and breaks as 1 char each.
+ */
+function inlineTextLength(nodes) {
+    let len = 0;
+    for (const node of nodes) {
+        if (node.type === 'text' || node.type === 'inline_code') {
+            len += (node.value || '').length;
+        } else if (node.type === 'soft_break' || node.type === 'hard_break') {
+            len += 1;
+        } else if (node.children) {
+            len += inlineTextLength(node.children);
+        }
+    }
+    return len;
+}
+
+/**
+ * Convert a text offset within inline children to a SourceCursor (path + offsetUtf16).
+ * @param {Array} nodes — inline children of a paragraph
+ * @param {number} offset — text offset (counting text/inline_code values + 1 per break)
+ * @param {boolean} isEnd — if true, uses <= boundary (for end cursors); if false, uses < (for start cursors)
+ * @returns {{ path: number[], offsetUtf16: number }}
+ */
+function inlineOffsetToCursor(nodes, offset, isEnd) {
+    let remaining = offset;
+    for (let i = 0; i < nodes.length; i++) {
+        const node = nodes[i];
+        if (node.type === 'text' || node.type === 'inline_code') {
+            const len = (node.value || '').length;
+            if (isEnd ? remaining <= len : remaining < len) {
+                return { path: [i], offsetUtf16: remaining };
+            }
+            remaining -= len;
+        } else if (node.type === 'soft_break' || node.type === 'hard_break') {
+            if (remaining === 0) {
+                return { path: [i], offsetUtf16: 0 };
+            }
+            remaining -= 1;
+        } else if (node.children) {
+            const childLen = inlineTextLength(node.children);
+            if (isEnd ? remaining <= childLen : remaining < childLen) {
+                const inner = inlineOffsetToCursor(node.children, remaining, isEnd);
+                return { path: [i, ...inner.path], offsetUtf16: inner.offsetUtf16 };
+            }
+            remaining -= childLen;
+        }
+    }
+    // Past the end — return end of last leaf
+    return endCursorForInline(nodes);
+}
+
+/**
+ * Cursor pointing past the end of the last leaf in an inline node array.
+ */
+function endCursorForInline(nodes) {
+    if (!nodes || nodes.length === 0) return { path: [], offsetUtf16: 0 };
+    const lastIdx = nodes.length - 1;
+    const last = nodes[lastIdx];
+    if (last.type === 'text' || last.type === 'inline_code') {
+        return { path: [lastIdx], offsetUtf16: (last.value || '').length };
+    }
+    if (last.children && last.children.length > 0) {
+        const inner = endCursorForInline(last.children);
+        return { path: [lastIdx, ...inner.path], offsetUtf16: inner.offsetUtf16 };
+    }
+    return { path: [lastIdx], offsetUtf16: 0 };
+}
+
+// =============== cursor helpers ===============
+
+/**
+ * Prepend a block index to a cursor's path.
+ */
+function prependBlockIdx(cursor, blockIdx) {
+    return { path: [blockIdx, ...cursor.path], offsetUtf16: cursor.offsetUtf16 };
+}
+
+/**
+ * Find cursor for first leaf of a descendant, starting from a partial path.
+ * Used for quote/list inter-element splits.
+ */
+function findFirstLeafCursorRel(block, startPath) {
+    let node = block;
+    for (const idx of startPath) {
+        if (!node.children || idx >= node.children.length) {
+            return { path: startPath, offsetUtf16: 0 };
+        }
+        node = node.children[idx];
+    }
+    const inner = findFirstLeafCursorInner(node, []);
+    return { path: [...startPath, ...inner.path], offsetUtf16: inner.offsetUtf16 };
+}
+
+function findLastLeafCursorRel(block, endPath) {
+    let node = block;
+    for (const idx of endPath) {
+        if (!node.children || idx >= node.children.length) {
+            return { path: endPath, offsetUtf16: 0 };
+        }
+        node = node.children[idx];
+    }
+    const inner = findLastLeafCursorInner(node, []);
+    return { path: [...endPath, ...inner.path], offsetUtf16: inner.offsetUtf16 };
+}
+
+function findFirstLeafCursorInner(node, basePath) {
+    if (node.type === 'text' || node.type === 'inline_code' || node.type === 'code_block') {
+        return { path: basePath, offsetUtf16: 0 };
+    }
+    if (node.type === 'thematic_break') {
+        return { path: basePath, offsetUtf16: 0 };
+    }
+    if (node.children) {
+        for (let i = 0; i < node.children.length; i++) {
+            const cursor = findFirstLeafCursorInner(node.children[i], [...basePath, i]);
+            if (cursor) return cursor;
+        }
+    }
+    return { path: basePath, offsetUtf16: 0 };
+}
+
+function findLastLeafCursorInner(node, basePath) {
+    if (node.type === 'text' || node.type === 'inline_code') {
+        return { path: basePath, offsetUtf16: (node.value || '').length };
+    }
+    if (node.type === 'code_block') {
+        return { path: basePath, offsetUtf16: (node.value || '').length };
+    }
+    if (node.type === 'thematic_break') {
+        return { path: basePath, offsetUtf16: 0 };
+    }
+    if (node.children) {
+        for (let i = node.children.length - 1; i >= 0; i--) {
+            const cursor = findLastLeafCursorInner(node.children[i], [...basePath, i]);
+            if (cursor) return cursor;
+        }
+    }
+    return { path: basePath, offsetUtf16: 0 };
+}
+
+/**
+ * Convert a rendered plain-text offset of a paragraph to a full SourceCursor.
+ * For paragraphs in plain-text, rendered text closely matches inline text content
+ * (exact for text/strong/emphasis/inline_code, approximate for links).
+ */
+function paragraphRenderedOffsetToCursor(paragraph, renderedOffset, blockIdx) {
+    let pos = 0;
+    let textPos = 0;
+    const children = paragraph.children;
+
+    for (let i = 0; i < children.length; i++) {
+        const child = children[i];
+        const rendered = renderInline([child], 'plain-text');
+        const textLen = inlineTextLength([child]);
+
+        if (pos + rendered.length > renderedOffset) {
+            const offsetInRendered = renderedOffset - pos;
+            if (child.type === 'text' || child.type === 'inline_code') {
+                return { path: [blockIdx, i], offsetUtf16: offsetInRendered };
+            }
+            if (child.type === 'soft_break' || child.type === 'hard_break') {
+                return { path: [blockIdx, i], offsetUtf16: 0 };
+            }
+            if (child.children) {
+                // For strong/emphasis: rendered = inner content, so offset maps 1:1
+                // For links: rendered = "label (URL)" — approximate
+                if (child.type === 'link') {
+                    const ratio = rendered.length > 0 ? offsetInRendered / rendered.length : 0;
+                    const approxTextOff = Math.min(Math.round(ratio * textLen), textLen);
+                    const innerCursor = inlineOffsetToCursor(child.children, approxTextOff, false);
+                    return { path: [blockIdx, i, ...innerCursor.path], offsetUtf16: innerCursor.offsetUtf16 };
+                }
+                const innerCursor = paragraphRenderedOffsetToCursorInline(child.children, offsetInRendered);
+                return { path: [blockIdx, i, ...innerCursor.path], offsetUtf16: innerCursor.offsetUtf16 };
+            }
+            return { path: [blockIdx, i], offsetUtf16: 0 };
+        }
+        pos += rendered.length;
+        textPos += textLen;
+    }
+    // Past end
+    const endC = endCursorForInline(children);
+    return { path: [blockIdx, ...endC.path], offsetUtf16: endC.offsetUtf16 };
+}
+
+function paragraphRenderedOffsetToCursorInline(nodes, renderedOffset) {
+    let pos = 0;
+    for (let i = 0; i < nodes.length; i++) {
+        const rendered = renderInline([nodes[i]], 'plain-text');
+        if (pos + rendered.length > renderedOffset) {
+            const off = renderedOffset - pos;
+            if (nodes[i].type === 'text' || nodes[i].type === 'inline_code') {
+                return { path: [i], offsetUtf16: off };
+            }
+            if (nodes[i].children) {
+                const inner = paragraphRenderedOffsetToCursorInline(nodes[i].children, off);
+                return { path: [i, ...inner.path], offsetUtf16: inner.offsetUtf16 };
+            }
+            return { path: [i], offsetUtf16: 0 };
+        }
+        pos += rendered.length;
+    }
+    return endCursorForInline(nodes);
+}
+
+/**
+ * Convert a rendered offset of a code_block (including fences) to a SourceCursor.
+ */
+function codeBlockRenderedOffsetToCursor(block, renderedOffset, blockIdx) {
+    const lang = block.lang || '';
+    const fenceOpenLen = 3 + lang.length + 1; // "```lang\n"
+    const valueOffset = Math.max(0, renderedOffset - fenceOpenLen);
+    const clampedOffset = Math.min(valueOffset, (block.value || '').length);
+    return { path: [blockIdx], offsetUtf16: clampedOffset };
+}
+
+/**
+ * Convert a rendered plain-text offset of any block to a SourceCursor.
+ */
+function blockRenderedOffsetToCursor(block, renderedOffset, blockIdx) {
+    if (block.type === 'paragraph') {
+        return paragraphRenderedOffsetToCursor(block, renderedOffset, blockIdx);
+    }
+    if (block.type === 'code_block') {
+        return codeBlockRenderedOffsetToCursor(block, renderedOffset, blockIdx);
+    }
+    // For other block types, use first/last leaf as approximation
+    if (renderedOffset === 0) {
+        const cursor = findFirstLeafCursorInner(block, []);
+        return { path: [blockIdx, ...cursor.path], offsetUtf16: cursor.offsetUtf16 };
+    }
+    // Approximate: treat as fraction of total text
+    const cursor = findFirstLeafCursorInner(block, []);
+    return { path: [blockIdx, ...cursor.path], offsetUtf16: cursor.offsetUtf16 };
+}
+
+// =============== source range computation ===============
 
 function findFirstLeafCursor(node, basePath) {
     if (node.type === 'text' || node.type === 'inline_code' || node.type === 'code_block') {
@@ -813,10 +1162,34 @@ function computeSourceRange(ir, blockStart, blockEnd) {
 function finalizeChunks(chunkData, ir, blockOffset = 0) {
     const total = chunkData.length;
     return chunkData.map((cd, index) => {
-        const sr = computeSourceRange(ir, cd.blockStart, cd.blockEnd);
-        if (blockOffset > 0) {
-            sr.start.path[0] += blockOffset;
-            sr.end.path[0] += blockOffset;
+        let sr;
+        if (cd.sourceStart) {
+            // Use precise cursors from split
+            const startPath = [...cd.sourceStart.path];
+            startPath[0] += blockOffset;
+            const endPath = cd.sourceEnd
+                ? [...cd.sourceEnd.path]
+                : findLastLeafCursor(ir.children[cd.blockEnd], [cd.blockEnd]).path;
+            if (cd.sourceEnd) {
+                endPath[0] += blockOffset;
+            } else {
+                endPath[0] += blockOffset;
+            }
+            sr = {
+                start: { path: startPath, offsetUtf16: cd.sourceStart.offsetUtf16 },
+                end: {
+                    path: endPath,
+                    offsetUtf16: cd.sourceEnd
+                        ? cd.sourceEnd.offsetUtf16
+                        : findLastLeafCursor(ir.children[cd.blockEnd], [cd.blockEnd]).offsetUtf16,
+                },
+            };
+        } else {
+            sr = computeSourceRange(ir, cd.blockStart, cd.blockEnd);
+            if (blockOffset > 0) {
+                sr.start.path[0] += blockOffset;
+                sr.end.path[0] += blockOffset;
+            }
         }
         return {
             index,
