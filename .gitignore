@@ -90,6 +90,7 @@ Thumbs.db
 
 # Text files
 *.txt
+*.bak
 
 # Files and directories starting/ending with tilde (~)
 ~*
