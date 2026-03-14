@@ -32,10 +32,11 @@
 - [x] Тесты планировщика (28 тестов)
 
 ## Стадия 5: Replanning (replanTail)
-- [ ] Реализация replanTail()
-- [ ] Восстановление хвоста из нормализованной IR по sourceRange
-- [ ] Эскалация стратегий при replanning
-- [ ] Тесты replanning
+- [x] Реализация replanTail()
+- [x] Восстановление хвоста из нормализованной IR по sourceRange
+- [x] Эскалация стратегий при replanning
+- [x] Рефакторинг: вынос planFromIr() из planner.js для переиспользования
+- [x] Тесты replanning (17 тестов)
 
 ## Стадия 6: Комплексные тесты
 - [ ] Golden tests

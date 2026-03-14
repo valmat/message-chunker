@@ -26,6 +26,19 @@ export function planDelivery(request) {
     validateTransportProfile(request.transport);
 
     const ir = normalize(request.markdown);
+    return planFromIr(ir, 0, request);
+}
+
+/**
+ * Core planning engine: run strategy escalation on a (possibly sub-) IR.
+ * blockOffset shifts sourceRange paths to refer to the full IR.
+ *
+ * @param {Object} ir — normalized IR (root node with children)
+ * @param {number} blockOffset — offset to add to block indices in sourceRange
+ * @param {Object} request — { strategy, preferredMode, transport, markdown }
+ * @returns {import('./types.js').DeliveryPlan}
+ */
+export function planFromIr(ir, blockOffset, request) {
     const budget = request.transport.safeTextBudget;
     const initialMode = resolveMode(request.preferredMode, request.transport);
 
@@ -41,7 +54,7 @@ export function planDelivery(request) {
         const mode = getModeForStrategy(strategy, initialMode);
         const result = tryStrategy(ir, strategy, mode, budget);
         if (result) {
-            const chunks = finalizeChunks(result.chunkData, ir);
+            const chunks = finalizeChunks(result.chunkData, ir, blockOffset);
             return {
                 chunks,
                 diagnostics: buildDiagnostics(
@@ -773,16 +786,23 @@ function computeSourceRange(ir, blockStart, blockEnd) {
 
 // --------------- finalize chunks ---------------
 
-function finalizeChunks(chunkData, ir) {
+function finalizeChunks(chunkData, ir, blockOffset = 0) {
     const total = chunkData.length;
-    return chunkData.map((cd, index) => ({
-        index,
-        total,
-        mode: cd.mode,
-        content: cd.content,
-        estimatedLength: cd.content.length,
-        sourceRange: computeSourceRange(ir, cd.blockStart, cd.blockEnd),
-    }));
+    return chunkData.map((cd, index) => {
+        const sr = computeSourceRange(ir, cd.blockStart, cd.blockEnd);
+        if (blockOffset > 0) {
+            sr.start.path[0] += blockOffset;
+            sr.end.path[0] += blockOffset;
+        }
+        return {
+            index,
+            total,
+            mode: cd.mode,
+            content: cd.content,
+            estimatedLength: cd.content.length,
+            sourceRange: sr,
+        };
+    });
 }
 
 // --------------- diagnostics ---------------
