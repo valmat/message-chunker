@@ -276,6 +276,20 @@ function splitParagraphIntoParts(paragraph, budget, mode) {
 }
 
 /**
+ * Build restChildren array, omitting empty text remainder.
+ */
+function buildRestChildren(remainder, children, fromIndex) {
+    const rest = [];
+    if (remainder.length > 0) {
+        rest.push({ type: 'text', value: remainder });
+    }
+    for (let j = fromIndex; j < children.length; j++) {
+        rest.push(children[j]);
+    }
+    return rest;
+}
+
+/**
  * Split inline children array: return the longest prefix that fits budget.
  */
 function splitInlineOnce(children, budget, mode) {
@@ -298,10 +312,7 @@ function splitInlineOnce(children, budget, mode) {
                         if ((accumulated + partialRendered).length <= budget) {
                             return {
                                 firstContent: accumulated + partialRendered,
-                                restChildren: [
-                                    { type: 'text', value: textSplit[1] },
-                                    ...children.slice(i + 1),
-                                ],
+                                restChildren: buildRestChildren(textSplit[1], children, i + 1),
                             };
                         }
                     }
@@ -321,10 +332,7 @@ function splitInlineOnce(children, budget, mode) {
                         firstContent: renderInline(
                             [{ type: 'text', value: textSplit[0] }], mode
                         ),
-                        restChildren: [
-                            { type: 'text', value: textSplit[1] },
-                            ...children.slice(i + 1),
-                        ],
+                        restChildren: buildRestChildren(textSplit[1], children, i + 1),
                     };
                 }
             }
@@ -338,10 +346,7 @@ function splitInlineOnce(children, budget, mode) {
             if (textSplit) {
                 return {
                     firstContent: textSplit[0],
-                    restChildren: [
-                        { type: 'text', value: textSplit[1] },
-                        ...children.slice(i + 1),
-                    ],
+                    restChildren: buildRestChildren(textSplit[1], children, i + 1),
                 };
             }
 
