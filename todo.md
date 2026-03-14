@@ -47,3 +47,10 @@
 - [x] Экспорт публичного API (planDelivery, replanTail, helpers)
 - [x] Тесты экспорта через index.js
 - [x] README с описанием модуля, API, примерами и ограничениями
+
+## Стадия 8: Финальное ревью — исправления и документация ограничений
+- [x] splitInlineOnce() — максимально плотное заполнение чанка (partial text node)
+- [x] Убран class="language-..." из rich-html code block (safe subset)
+- [x] Валидация rejectReason в replanTail()
+- [ ] Рефакторинг SourceRange для точного адресования внутри split-блоков → [docs/refactoring-sourcerange.md](docs/refactoring-sourcerange.md)
+- [x] Задокументированы осознанные ограничения v1 → [docs/known-limitations.md](docs/known-limitations.md)

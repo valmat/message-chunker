@@ -31,9 +31,15 @@ export function replanTail(request) {
         preferredMode,
         nextStrategy,
         transport,
+        rejectReason,
     } = request;
 
     validateTransportProfile(transport);
+
+    const VALID_REJECT_REASONS = ['too-long', 'format-rejected'];
+    if (rejectReason && !VALID_REJECT_REASONS.includes(rejectReason)) {
+        throw new Error(`Unknown rejectReason: ${rejectReason}. Valid values: ${VALID_REJECT_REASONS.join(', ')}`);
+    }
 
     if (failedChunkIndex < 0 || failedChunkIndex >= previousPlan.chunks.length) {
         throw new RangeError(

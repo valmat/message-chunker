@@ -138,7 +138,7 @@ describe('renderer-html — code blocks', () => {
 
     it('code block with language', () => {
         const { html } = renderBoth('```js\nconst x = 1;\n```');
-        assert.equal(html, '<pre><code class="language-js">const x = 1;</code></pre>');
+        assert.equal(html, '<pre>const x = 1;</pre>');
     });
 
     it('code block escapes HTML', () => {

@@ -285,6 +285,41 @@ describe('replanTail — validation', () => {
             /Unknown strategy/
         );
     });
+
+    it('throws on unknown rejectReason', () => {
+        const md = 'Hello';
+        const original = plan(md);
+
+        assert.throws(
+            () => replanTail({
+                markdown: md,
+                previousPlan: original,
+                failedChunkIndex: 0,
+                preferredMode: 'auto',
+                nextStrategy: 'preserve',
+                transport,
+                rejectReason: 'invalid-reason',
+            }),
+            /Unknown rejectReason/
+        );
+    });
+
+    it('accepts valid rejectReason values', () => {
+        const md = 'Hello';
+        const original = plan(md);
+
+        for (const reason of ['too-long', 'format-rejected']) {
+            assert.doesNotThrow(() => replanTail({
+                markdown: md,
+                previousPlan: original,
+                failedChunkIndex: 0,
+                preferredMode: 'auto',
+                nextStrategy: 'preserve',
+                transport,
+                rejectReason: reason,
+            }));
+        }
+    });
 });
 
 // =============== delivered prefix not resent ===============

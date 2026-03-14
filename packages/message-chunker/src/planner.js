@@ -286,8 +286,27 @@ function splitInlineOnce(children, budget, mode) {
         const newContent = accumulated + nodeRendered;
 
         if (newContent.length > budget) {
-            // Split before this node if we have some content
             if (accumulated.length > 0) {
+                // Try to take a partial piece from a text node to fill remaining budget
+                if (children[i].type === 'text') {
+                    const remainingBudget = budget - accumulated.length;
+                    const textSplit = splitTextNode(children[i].value, remainingBudget, mode);
+                    if (textSplit && textSplit[0].length > 0) {
+                        const partialRendered = renderInline(
+                            [{ type: 'text', value: textSplit[0] }], mode
+                        );
+                        if ((accumulated + partialRendered).length <= budget) {
+                            return {
+                                firstContent: accumulated + partialRendered,
+                                restChildren: [
+                                    { type: 'text', value: textSplit[1] },
+                                    ...children.slice(i + 1),
+                                ],
+                            };
+                        }
+                    }
+                }
+                // Fall back to splitting before this node
                 return {
                     firstContent: accumulated,
                     restChildren: children.slice(i),
