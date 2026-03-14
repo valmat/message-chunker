@@ -236,7 +236,7 @@ In the first version we support:
 - lists;
 - quotes;
 - fenced code blocks;
-- strong / emphasis;
+- strong / emphasis (only `*` and `**` markers; underscore markers `_` and `__` are intentionally not supported — see section 9.1);
 - inline code;
 - links;
 - line breaks.
@@ -261,6 +261,14 @@ For v1 the following general policy is normative:
 1. if an unsupported construct can be safely reduced to a supported structure — reduce it;
 2. otherwise transform it into a plain-text representation keeping the text order;
 3. attempts to partially keep exotic structure as arbitrary HTML subset are not required.
+
+### 9.1. Underscore emphasis is not supported
+
+In v1 the underscore markers `_text_` (emphasis) and `__text__` (strong) are intentionally not recognized as formatting.
+
+Rationale: in real messages from LLMs, underscores frequently appear inside variable names, file paths, identifiers and other technical text (`my_variable`, `some_file_name.txt`). Supporting underscore-based emphasis creates many false positives while providing no practical benefit — LLM-generated markdown virtually always uses `*` and `**` for emphasis and strong.
+
+The parser must treat `_` and `__` as literal text characters, not as emphasis/strong delimiters.
 
 ### Separate rule for raw HTML
 
