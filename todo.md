@@ -14,10 +14,10 @@
 - [x] Тесты парсера/нормализатора (36 тестов)
 
 ## Стадия 3: Рендереры
-- [ ] rich-html рендерер (safe HTML subset: b, i, code, pre, a)
-- [ ] plain-text рендерер
-- [ ] Каноническое форматирование блоков (spacing, quote prefix, list markers и т.д.)
-- [ ] Тесты рендереров
+- [x] rich-html рендерер (safe HTML subset: b, i, code, pre, a)
+- [x] plain-text рендерер
+- [x] Каноническое форматирование блоков (spacing, quote prefix, list markers и т.д.)
+- [x] Тесты рендереров (49 тестов)
 
 ## Стадия 4: Планировщик (planDelivery)
 - [ ] Greedy packing алгоритм
