@@ -141,9 +141,9 @@ describe('renderer-html — code blocks', () => {
         assert.equal(html, '<pre><code class="language-js">const x = 1;</code></pre>');
     });
 
-    it('code block with language escapes language string', () => {
-        const { html } = renderBoth('```c++\nint x;\n```');
-        assert.ok(html.includes('class="language-c++">'));
+    it('code block with language escapes special characters in language string', () => {
+        const { html } = renderBoth('```a<b>&"c\nint x;\n```');
+        assert.ok(html.includes('class="language-a&lt;b&gt;&amp;&quot;c"'));
     });
 
     it('code block escapes HTML', () => {
