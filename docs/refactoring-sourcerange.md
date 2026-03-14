@@ -2,62 +2,111 @@
 
 ## Проблема
 
-При разбиении крупного блока (параграф, список, цитата) на несколько чанков в стратегиях `split-blocks-soft`, `plain-text` и `forced-plain-text`, все фрагменты одного блока получают одинаковый `sourceRange` — диапазон всего top-level блока.
+При разбиении крупного блока (параграф, список, цитата, code block) на несколько чанков в стратегиях `split-blocks-soft`, `plain-text` и `forced-plain-text`, все фрагменты одного блока получают одинаковый `sourceRange` — диапазон всего top-level блока.
 
-Затем `replanTail()` использует только `sourceRange.start.path[0]` (индекс top-level блока) для определения начала хвоста. Если отказ произошёл на 2-м фрагменте длинного параграфа, replan возвращается к началу всего параграфа и повторно отправляет уже доставленный 1-й фрагмент.
+Затем `replanTail()` использует только `sourceRange.start.path[0]` (индекс top-level блока) для определения начала хвоста. Если reject произошёл на 2-м фрагменте длинного параграфа, replan возвращается к началу всего параграфа и повторно отправляет уже доставленный 1-й фрагмент.
+
+## Что именно сейчас ломается
+
+### Симптом
+- `planDelivery()` корректно режет длинный блок на несколько чанков
+- Но их `sourceRange` совпадает
+- `replanTail()` не может отличить «начало блока» от «середины блока»
+
+### Практический эффект
+- нарушается инвариант «already delivered prefix is committed»
+- возможна повторная отправка текста после reject в середине длинного блока
+- это не только проблема метаданных, а observable bug пользовательского поведения
 
 ### Нарушаемые требования RFC
-
-- §6.6 — `SourceRange` должен адресовать логический диапазон внутри нормализованного IR
-- §6.10 — SourceCursor включает `path` (массив индексов) и `offsetUtf16` для адресации внутри leaf-ноды
+- §6.6 — уже доставленный префикс считается зафиксированным
+- §6.10 / §17.1 — `SourceRange` должен адресовать логический диапазон внутри нормализованного IR, включая `offsetUtf16`
 - §18.1 — хвост replanning начинается с `sourceRange.start` отказавшего чанка
 - §19.7 — уже доставленный префикс не должен пересылаться повторно
 
-### Пример
+## Минимальный пример
 
-```
-Markdown: "Very long paragraph with many sentences..."
+```text
+Markdown: "Very long paragraph with many sentences ..."
 Budget: 50
 
-planDelivery → chunks:
-  [0] "Very long paragraph with"     sourceRange: {start: {path:[0], offset:0}, end: {path:[0], offset:100}}
-  [1] "many sentences that go on"    sourceRange: {start: {path:[0], offset:0}, end: {path:[0], offset:100}}
-  [2] "and more text here..."        sourceRange: {start: {path:[0], offset:0}, end: {path:[0], offset:100}}
+planDelivery -> chunks:
+  [0] "Very long paragraph with"
+  [1] "many sentences that go on"
+  [2] "and more text here ..."
 
-Чанк 1 отклонён транспортом.
-replanTail → tail начинается с path[0]=0, т.е. с начала параграфа.
-Результат: контент чанка 0 ("Very long paragraph with") попадает в хвост повторно.
+Но у всех чанков один и тот же sourceRange:
+  start = { path: [0, 0], offsetUtf16: 0 }
+  end   = { path: [0, 0], offsetUtf16: 100 }
+
+Если chunk[1] отклонён,
+replanTail() начинает хвост снова с path[0] = 0,
+то есть с начала всего параграфа.
 ```
+
+## Цель рефакторинга
+
+Сделать `SourceRange` точным для каждого чанка, чтобы он описывал именно тот логический диапазон IR, который попал в chunk, а `replanTail()` мог восстановить tail начиная с точного места отказа, а не только с начала top-level блока.
 
 ## Предлагаемое решение
 
-### 1. Уточнить SourceRange при split внутри блока
+### 1. Разделить два уровня данных при split
 
-При разбиении блока на фрагменты, каждый фрагмент должен получить точный `sourceRange`:
+Сегодня split-функции возвращают почти только rendered strings. Нужно, чтобы они возвращали структуру вида:
 
-- **Для параграфов**: `path` включает индекс inline-ребёнка, `offsetUtf16` — позицию внутри текстового узла, где произошёл split.
-- **Для списков**: `path` включает индекс `list_item`, далее — позицию внутри содержимого элемента.
-- **Для цитат**: `path` включает индекс внутреннего блока цитаты.
-- **Для code_block**: `offsetUtf16` — позиция в `value` строке, где произошёл split.
+```ts
+{
+  content: string,
+  sourceRange: SourceRange
+}
+```
 
-### 2. Обновить replanTail()
+или эквивалентный внутренний формат с достаточной информацией для последующего построения `SourceRange`.
+
+### 2. Накапливать intra-block позицию при split
+
+Для каждого fragment внутри одного блока нужно хранить:
+- путь до leaf-ноды,
+- стартовый `offsetUtf16`,
+- конечный `offsetUtf16`,
+- при необходимости — границы нескольких leaf-нод, если fragment пересекает несколько inline children.
+
+### 3. Уточнить политику по типам блоков
+
+- **Paragraph**: диапазон должен указывать на точные inline children и смещения внутри текстовых leaf-нод
+- **Quote**: диапазон должен адресовать внутренний блок цитаты и позицию внутри него
+- **List / list_item**: диапазон должен включать индекс `list_item` и дальше путь внутрь его содержимого
+- **Code block**: диапазон может указывать на одну leaf-ноду `code_block` с точным `offsetUtf16` в `value`
+- **Forced plain split across rendered text**: если split происходит после деградации formatting, всё равно нужен логический range по исходному IR, а не по готовой строке
+
+### 4. Научить `replanTail()` строить sub-IR по точному курсору
 
 `replanTail()` должен уметь:
-1. Навигировать по `path` вглубь IR-дерева (не только `path[0]`)
-2. Если `offsetUtf16 > 0`, «обрезать» leaf-ноду, создавая суб-IR начиная с указанной позиции
-3. Собрать хвост: обрезанный текущий блок + все последующие блоки
+- навигировать по полному `path`, а не только по `path[0]`
+- отрезать leaf-ноду с `offsetUtf16 > 0`
+- поднимать обрезку вверх по дереву, сохраняя валидную структуру IR
+- собирать tail как «остаток текущего блока с точки отказа + все последующие top-level блоки»
 
-### 3. Обновить split-функции
+### 5. Добавить тесты именно на intra-block replan
 
-Функции `splitParagraphIntoParts`, `splitQuoteIntoParts`, `splitListIntoParts`, `splitCodeBlockIntoParts` должны возвращать не только rendered strings, но и метаданные о позиции split в IR-дереве.
+Нужны отдельные кейсы, где reject происходит:
+- во 2-м чанке длинного paragraph
+- во 2-м чанке длинного list item
+- во 2-м чанке длинной quote
+- во 2-м чанке split code block
+
+Во всех этих кейсах tail не должен содержать контент уже доставленного фрагмента.
 
 ## Затрагиваемые файлы
 
-- `src/planner.js` — `trySplitBlocksSoft`, `doForcedPlainText`, все `split*IntoParts`, `finalizeChunks`
-- `src/replan.js` — `replanTail`, навигация по path
-- `test/replan.test.js` — тесты для intra-block replan
-- `test/complex.test.js` — тесты "reject in the middle"
+- `packages/message-chunker/src/planner.js`
+- `packages/message-chunker/src/replan.js`
+- `packages/message-chunker/test/replan.test.js`
+- `packages/message-chunker/test/complex.test.js`
+- возможно `packages/message-chunker/src/types.js`, если потребуется уточнить внутренние структуры split metadata
 
 ## Оценка сложности
 
-Высокая. Требует переработки интерфейса между split-функциями и финализатором чанков, а также логики восстановления хвоста в replanTail. Рекомендуется как отдельная задача v1.1.
+Высокая.
+
+Это не локальная правка, а изменение модели адресации внутри planner/replan pipeline. Делать как отдельную задачу после согласования минимального дизайна `sourceRange` для split-fragments.

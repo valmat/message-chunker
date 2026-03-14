@@ -54,3 +54,10 @@
 - [x] Валидация rejectReason в replanTail()
 - [ ] Рефакторинг SourceRange для точного адресования внутри split-блоков → [docs/refactoring-sourcerange.md](docs/refactoring-sourcerange.md)
 - [x] Задокументированы осознанные ограничения v1 → [docs/known-limitations.md](docs/known-limitations.md)
+
+## Стадия 9: Открытые вопросы после ревью RFC
+- [ ] Исправить `SourceRange`/`replanTail()` так, чтобы reject внутри split-блока не переотправлял уже доставленный префикс → [docs/refactoring-sourcerange.md](docs/refactoring-sourcerange.md)
+- [ ] Согласовать контракт `rejectReason`: либо вернуть код к значениям RFC (`too-long`, `invalid-markup`, `transport-reject`), либо обновить RFC/README/типы единообразно
+- [ ] Синхронизировать реализацию rich-html code block с обновлённым RFC: разрешён `class="language-*"` для сохранения language info fenced block
+- [ ] Явно определить политику для `hadDegradation` при unsupported markdown: либо реализовать сигнал из normalizer, либо зафиксировать это как сознательное отклонение от RFC
+- [ ] Решить policy для экстремально маленького бюджета у code block: либо оставить текущий аварийный fallback как documented limitation, либо скорректировать RFC под фактическое поведение

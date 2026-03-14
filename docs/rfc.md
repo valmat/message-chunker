@@ -402,18 +402,27 @@ For the first version the following are allowed:
 - <pre>
 - <a>
 
+Allowed attributes in v1 are intentionally restricted:
+
+- `href` on `<a>`;
+- exceptionally, `class="language-..."` on `<code>` when it is used inside `<pre>` to preserve the language info string of a fenced code block.
+
 Requirements:
 
 - raw HTML from input is not passed as is;
 - unsafe content is escaped;
-- arbitrary tags and attributes are not generated.
+- arbitrary tags are not generated;
+- arbitrary attributes are not generated, except the explicitly allowed `href` on `<a>` and `class="language-..."` on `<code>` inside `<pre>` for code blocks.
 
 Additional rules for rendering block types in v1:
 
 - heading is rendered as <b>Heading text</b> with normal separation of blocks by line breaks;
 - levels h1..h6 as separate HTML semantics are not kept in v1;
 - quote is not rendered by <blockquote>, but as quoted lines with the prefix &gt; ;
-- thematic_break is rendered as a separate line --- with normal empty lines around by block rules.
+- thematic_break is rendered as a separate line --- with normal empty lines around by block rules;
+- code_block in rich-html is rendered inside `<pre>`;
+- if the code block has no language info string, a simple form like `<pre>...</pre>` is allowed;
+- if the code block has a language info string, it is allowed and recommended to preserve it as `<pre><code class="language-LANG">...</code></pre>`.
 
 Additional rules for rendering links in v1:
 
