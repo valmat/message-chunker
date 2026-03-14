@@ -79,7 +79,8 @@ export function unicodeSafeSplit(text, maxLen) {
             splitAt--;
         }
     }
-    if (splitAt <= 0) splitAt = 1; // At minimum take one character
+    // If we backed up to 0, take the whole surrogate pair (2 code units)
+    if (splitAt <= 0) splitAt = Math.min(2, text.length);
     return [text.slice(0, splitAt), text.slice(splitAt)];
 }
 

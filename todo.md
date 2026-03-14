@@ -20,16 +20,16 @@
 - [x] Тесты рендереров (49 тестов)
 
 ## Стадия 4: Планировщик (planDelivery)
-- [ ] Greedy packing алгоритм
-- [ ] Стратегия preserve
-- [ ] Стратегия split-blocks
-- [ ] Стратегия split-blocks-soft (сплит параграфов, list_item, quote)
-- [ ] Стратегия plain-text
-- [ ] Стратегия forced-plain-text (Unicode-safe split)
-- [ ] Эскалация стратегий
-- [ ] Формирование SourceRange
-- [ ] Диагностика
-- [ ] Тесты планировщика
+- [x] Greedy packing алгоритм
+- [x] Стратегия preserve
+- [x] Стратегия split-blocks
+- [x] Стратегия split-blocks-soft (сплит параграфов, list_item, quote)
+- [x] Стратегия plain-text
+- [x] Стратегия forced-plain-text (Unicode-safe split)
+- [x] Эскалация стратегий
+- [x] Формирование SourceRange
+- [x] Диагностика
+- [x] Тесты планировщика (28 тестов)
 
 ## Стадия 5: Replanning (replanTail)
 - [ ] Реализация replanTail()
