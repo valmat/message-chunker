@@ -92,6 +92,8 @@ function renderInlineNodeHtml(node) {
         case 'hard_break':
             return '\n';
         default:
+            if (node.children) return renderInlineHtml(node.children);
+            if (node.value !== undefined) return escapeHtml(node.value);
             return '';
     }
 }

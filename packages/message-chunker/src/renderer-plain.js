@@ -88,6 +88,8 @@ function renderInlineNodePlain(node) {
         case 'hard_break':
             return '\n';
         default:
+            if (node.children) return renderInlinePlain(node.children);
+            if (node.value !== undefined) return node.value;
             return '';
     }
 }
