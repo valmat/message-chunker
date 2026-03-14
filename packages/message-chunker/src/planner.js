@@ -1121,9 +1121,6 @@ function blockRenderedOffsetToCursor(block, renderedOffset, blockIdx) {
 function quoteRenderedOffsetToCursor(quote, renderedOffset, blockIdx) {
     const childRendered = quote.children.map(c => renderBlocks([c], 'plain-text'));
     const inner = childRendered.join('\n\n');
-    const quotedLines = inner.split('\n').map(line => line === '' ? '>' : '> ' + line);
-    const fullRendered = quotedLines.join('\n');
-
     // Walk child blocks to find which one contains the offset
     let pos = 0;
     for (let ci = 0; ci < quote.children.length; ci++) {
