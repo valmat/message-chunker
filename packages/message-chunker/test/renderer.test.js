@@ -367,3 +367,32 @@ describe('renderers — edge cases', () => {
         assert.equal(plain, '');
     });
 });
+
+describe('renderer-html — safe subset contract', () => {
+    it('mixed markdown uses only allowed HTML tags', () => {
+        const md = '# Title\n\n**bold** *italic* [link](https://example.com) `code`\n\n```js\nconst x = 1;\n```\n\n> quote\n\n- item\n\n<div>raw</div>';
+        const { html } = renderBoth(md);
+        const tags = Array.from(html.matchAll(/<\/?([a-z]+)\b/g), match => match[1]);
+        const allowed = new Set(['a', 'b', 'i', 'code', 'pre']);
+
+        assert.ok(tags.length > 0, 'expected some rich-html tags in output');
+        for (const tag of tags) {
+            assert.ok(allowed.has(tag), `unexpected rich-html tag: <${tag}> in ${html}`);
+        }
+    });
+
+    it('link tag does not get unexpected attributes', () => {
+        const { html } = renderBoth('[label](https://example.com?a=1&b=2)');
+        assert.equal(html, '<a href="https://example.com?a=1&amp;b=2">label</a>');
+        assert.ok(!html.includes('title='));
+        assert.ok(!html.includes('target='));
+        assert.ok(!html.includes('rel='));
+    });
+
+    it('code block language is exposed only via language-* class', () => {
+        const { html } = renderBoth('```ts\nconst x = 1;\n```');
+        assert.equal(html, '<pre><code class="language-ts">const x = 1;</code></pre>');
+        assert.ok(!html.includes('style='));
+        assert.ok(!html.includes('data-'));
+    });
+});

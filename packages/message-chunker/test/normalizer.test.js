@@ -377,3 +377,27 @@ describe('normalizer — complex document', () => {
         assert.deepEqual(ir1, ir2);
     });
 });
+
+describe('normalizer — unsupported markdown fallbacks', () => {
+    it('footnote-like syntax stays as plain text in document order', () => {
+        const md = 'note[^1]\n\n[^1]: footnote text';
+        const ir = normalize(md);
+
+        assert.deepEqual(topTypes(ir), ['paragraph', 'paragraph']);
+        assert.equal(collectText(ir.children[0]), 'note[^1]');
+        assert.equal(collectText(ir.children[1]), '[^1]: footnote text');
+    });
+
+    it('directive-like syntax stays as literal text', () => {
+        const md = '::note\ncontent\n::';
+        const ir = normalize(md);
+        const paragraph = ir.children[0];
+
+        assert.equal(paragraph.type, 'paragraph');
+        assert.deepEqual(childTypes(paragraph), ['text', 'soft_break', 'text', 'soft_break', 'text']);
+        assert.equal(collectText(paragraph), '::notecontent::');
+        assert.equal(paragraph.children[0].value, '::note');
+        assert.equal(paragraph.children[2].value, 'content');
+        assert.equal(paragraph.children[4].value, '::');
+    });
+});
