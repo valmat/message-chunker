@@ -303,6 +303,61 @@ describe('planner — chunk structure', () => {
 // =============== diagnostics ===============
 
 describe('planner — diagnostics', () => {
+    it('empty IR keeps zero diagnostics but still resolves mode fallback', () => {
+        const result = plan('   \n\n   ', {
+            preferredMode: 'rich-html',
+            transport: { supportsRichHtml: false },
+        });
+        const d = result.diagnostics;
+
+        assert.deepEqual(result.chunks, []);
+        assert.equal(d.sourceLength, 8);
+        assert.equal(d.plainTextLengthEstimate, 0);
+        assert.equal(d.normalizedBlockCount, 0);
+        assert.equal(d.chunkCount, 0);
+        assert.equal(d.requestedStrategy, 'preserve');
+        assert.equal(d.usedStrategy, 'preserve');
+        assert.equal(d.requestedMode, 'rich-html');
+        assert.equal(d.usedMode, 'plain-text');
+        assert.equal(d.degradedToPlainText, true);
+        assert.equal(d.hadDegradation, true);
+        assert.deepEqual(d.splitBlockTypes, []);
+    });
+
+    it('empty IR with rich-html transport does not report degradation', () => {
+        const result = plan('', {
+            preferredMode: 'auto',
+            transport: { supportsRichHtml: true },
+        });
+        const d = result.diagnostics;
+
+        assert.equal(d.sourceLength, 0);
+        assert.equal(d.plainTextLengthEstimate, 0);
+        assert.equal(d.normalizedBlockCount, 0);
+        assert.equal(d.chunkCount, 0);
+        assert.equal(d.usedMode, 'rich-html');
+        assert.equal(d.degradedToPlainText, false);
+        assert.equal(d.hadDegradation, false);
+    });
+
+    it('forced-plain-text requested from rich preference reports mode degradation explicitly', () => {
+        const result = plan('A'.repeat(450), {
+            preferredMode: 'rich-html',
+            strategy: 'forced-plain-text',
+            transport: { safeTextBudget: 200 },
+        });
+        const d = result.diagnostics;
+
+        assert.ok(result.chunks.length >= 3);
+        assert.equal(d.requestedStrategy, 'forced-plain-text');
+        assert.equal(d.usedStrategy, 'forced-plain-text');
+        assert.equal(d.requestedMode, 'rich-html');
+        assert.equal(d.usedMode, 'plain-text');
+        assert.equal(d.degradedToPlainText, true);
+        assert.equal(d.hadDegradation, true);
+        assert.deepEqual(d.splitBlockTypes, ['paragraph']);
+    });
+
     it('reports correct diagnostics for simple case', () => {
         const md = 'Hello world';
         const result = plan(md);

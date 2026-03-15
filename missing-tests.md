@@ -187,7 +187,7 @@
 
 ---
 
-### 11. [ ] Coverage-driven hardening по отчёту
+### 11. [x] Coverage-driven hardening по отчёту
 
 **Почему важно**
 - После текущего добора coverage уже высокий, но отчёт всё ещё показывает хвосты в `planner.js`, `replan.js` и `normalizer.js`.
@@ -200,7 +200,7 @@
 - [x] normalizer удаляет одиночный пустой `text` node и корректно схлопывает соседние `text` nodes после fallback-веток;
 - [x] renderers имеют явный negative-contract на default fallback ветки для unknown block/inline nodes: не падают и детерминированно сводят к `text`/`children`;
 - [x] `splitForcedPlainText()` отдельно покрыт по всем приоритетам (`\n\n` → `\n` → whitespace → forced split), а не только через интеграционные planner cases;
-- [ ] planner diagnostic/mode edge cases дополнительно зафиксированы для пустого IR и forced fallback paths.
+- [x] planner diagnostic/mode edge cases дополнительно зафиксированы для пустого IR и forced fallback paths.
 
 **Полезные тесты**
 - [x] white-box test на `replanTail()` для last-chunk reject, где после trim реально не остаётся контента;
