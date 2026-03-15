@@ -184,3 +184,26 @@
 - [x] golden на forced split строки из emoji и ASCII;
 - [x] replan case, где reject попадает внутрь Unicode-heavy paragraph;
 - [x] expected offsets на комбинации `emoji + combining marks + plain text`.
+
+---
+
+### 11. [ ] Coverage-driven hardening по отчёту
+
+**Почему важно**
+- После текущего добора coverage уже высокий, но отчёт всё ещё показывает хвосты в `planner.js`, `replan.js` и `normalizer.js`.
+- Часть из них — не продуктовые happy-path сценарии, а защитные ветки и fallback-логика, которую полезно зацементировать отдельными tests, особенно если дальше будет рефакторинг.
+
+**Что стоит проверить**
+- [ ] `replanTail()` возвращает корректный пустой tail/diagnostics при пустом остатке после trim (`emptyResult` path);
+- [ ] `replanTail()` корректно обрабатывает trim/translate guard cases, когда cursor указывает на уже исчезнувший leaf или child index выходит за границы;
+- [ ] normalizer устойчив к degraded token-shape cases: orphan `_close`, block-level `inline`, unknown block token с `content`, fallback через `token.attrs`;
+- [ ] normalizer удаляет одиночный пустой `text` node и корректно схлопывает соседние `text` nodes после fallback-веток;
+- [ ] renderers имеют явный negative-contract на default fallback ветки для unknown block/inline nodes: не падают и детерминированно сводят к `text`/`children`;
+- [ ] `splitForcedPlainText()` отдельно покрыт по всем приоритетам (`\n\n` → `\n` → whitespace → forced split), а не только через интеграционные planner cases;
+- [ ] planner diagnostic/mode edge cases дополнительно зафиксированы для пустого IR и forced fallback paths.
+
+**Полезные тесты**
+- [ ] white-box test на `replanTail()` для last-chunk reject, где после trim реально не остаётся контента;
+- [ ] white-box/mocked-parser test на synthetic markdown-it tokens без matching close и с `attrs` вместо `attrGet`;
+- [ ] unit-tests на renderer fallback с вручную собранными unknown IR nodes;
+- [ ] отдельный unit-suite для `splitForcedPlainText()` с синтетическими строками на каждый приоритет split.
