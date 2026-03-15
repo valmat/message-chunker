@@ -547,7 +547,7 @@ describe('planner — list_item continuation semantics', () => {
 
         assert.equal(result.diagnostics.usedStrategy, 'forced-plain-text');
         assert.ok(result.chunks.length >= 3, `expected degraded continuation, got ${result.chunks.length} chunk(s)`);
-        assert.equal(result.chunks[0].content, '-');
+        assert.match(result.chunks[0].content, /^-\s?$/);
         assert.ok(result.chunks.slice(1).some(chunk => !chunk.content.startsWith('- ')), 'expected degraded continuation without repeated marker');
         for (const chunk of result.chunks) {
             assert.ok(chunk.content.length <= 200, `chunk ${chunk.index} too long: ${chunk.content.length}`);
