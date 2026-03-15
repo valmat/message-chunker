@@ -53,7 +53,7 @@
 
 ---
 
-### 3. Семаника continuation у `list_item`
+### 3. [x] Семаника continuation у `list_item`
 
 **Почему важно**
 - RFC требует по возможности повторять marker в continuation fragment.

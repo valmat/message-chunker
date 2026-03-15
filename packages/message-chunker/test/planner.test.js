@@ -503,3 +503,54 @@ describe('planner — determinism', () => {
         }
     });
 });
+
+describe('planner — list_item continuation semantics', () => {
+    it('repeats bullet marker in continuation fragments when paragraph split allows it', () => {
+        const md = '- ' + 'alpha beta gamma delta. '.repeat(20);
+        const result = plan(md, {
+            preferredMode: 'plain-text',
+            strategy: 'split-blocks-soft',
+            transport: { safeTextBudget: 200 },
+        });
+
+        assert.ok(result.chunks.length >= 2, `expected split list item, got ${result.chunks.length} chunk(s)`);
+        for (const chunk of result.chunks) {
+            assert.ok(chunk.content.startsWith('- '), `expected repeated marker, got ${JSON.stringify(chunk.content)}`);
+            assert.ok(chunk.content.length <= 200, `chunk ${chunk.index} too long: ${chunk.content.length}`);
+        }
+    });
+
+    it('keeps multi-paragraph continuation readable after split', () => {
+        const md = '- first para ' + 'one two three four. '.repeat(8) + '\n\n  second para ' + 'five six seven eight. '.repeat(8);
+        const result = plan(md, {
+            preferredMode: 'plain-text',
+            strategy: 'split-blocks-soft',
+            transport: { safeTextBudget: 200 },
+        });
+
+        assert.equal(result.diagnostics.usedStrategy, 'split-blocks-soft');
+        assert.ok(result.chunks.length >= 2, `expected split list item, got ${result.chunks.length} chunk(s)`);
+        assert.match(result.chunks[0].content, /^- first para /);
+        assert.ok(result.chunks.some(chunk => /^- second para /.test(chunk.content)), 'expected readable continuation for second paragraph');
+        for (const chunk of result.chunks) {
+            assert.ok(chunk.content.length <= 200, `chunk ${chunk.index} too long: ${chunk.content.length}`);
+        }
+    });
+
+    it('forced-plain-text may degrade continuation to plain text without repeated marker', () => {
+        const md = '- ' + 'Supercalifragilisticexpialidocious'.repeat(15);
+        const result = plan(md, {
+            preferredMode: 'plain-text',
+            strategy: 'forced-plain-text',
+            transport: { safeTextBudget: 200 },
+        });
+
+        assert.equal(result.diagnostics.usedStrategy, 'forced-plain-text');
+        assert.ok(result.chunks.length >= 3, `expected degraded continuation, got ${result.chunks.length} chunk(s)`);
+        assert.equal(result.chunks[0].content, '-');
+        assert.ok(result.chunks.slice(1).some(chunk => !chunk.content.startsWith('- ')), 'expected degraded continuation without repeated marker');
+        for (const chunk of result.chunks) {
+            assert.ok(chunk.content.length <= 200, `chunk ${chunk.index} too long: ${chunk.content.length}`);
+        }
+    });
+});
