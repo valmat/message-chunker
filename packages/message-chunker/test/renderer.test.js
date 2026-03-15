@@ -174,8 +174,6 @@ describe('renderer-html — thematic break', () => {
     });
 });
 
-
-
 describe('renderers — unknown-node fallbacks', () => {
     it('rich-html renderer falls back to children/value for unknown nodes', () => {
         const blocks = [

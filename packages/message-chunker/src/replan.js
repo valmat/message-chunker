@@ -216,8 +216,8 @@ function translatePathFromTrimmedNode(node, trimPath, trimOffset, localPath) {
 
 function isEffectivelyEmptyBlock(block) {
     if (!block) return true;
-    if (block.type === 'text' || block.type === 'inline_code' || block.type === 'code_block') {
-        return (block.value || '').length === 0;
+    if (block.value !== undefined) {
+        return String(block.value).length === 0;
     }
     if (block.children) {
         return block.children.every(child => isEffectivelyEmptyBlock(child));
