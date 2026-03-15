@@ -385,6 +385,25 @@ describe('planner — budget invariant', () => {
             );
         }
     });
+
+    it('keeps continuation chunks within budget after splitting the first list-item block', () => {
+        const md = '- ' + 'intro '.repeat(80) + '\n\n  ' + 'tail '.repeat(80);
+        const budget = 200;
+        const result = plan(md, {
+            preferredMode: 'plain-text',
+            strategy: 'split-blocks-soft',
+            transport: { safeTextBudget: budget },
+        });
+
+        assert.ok(result.chunks.length >= 3, `expected split plan, got ${result.chunks.length} chunks`);
+        for (const chunk of result.chunks) {
+            assert.ok(
+                chunk.content.length <= budget,
+                `Budget exceeded after first-block split: ${chunk.content.length} > ${budget}; ` +
+                `content=${JSON.stringify(chunk.content)}`
+            );
+        }
+    });
 });
 
 // =============== validation ===============

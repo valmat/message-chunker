@@ -557,55 +557,79 @@ function splitListItemForListFragments(item, budget, mode, itemIdx) {
     }));
 }
 
+function renderStandaloneListItemBlockContent(block, marker, indent, mode) {
+    const content = renderBlocks([block], mode);
+    const indented = content.split('\n').map(line => indent + line).join('\n');
+    return marker + indented.trimStart();
+}
+
+function splitStandaloneListItemBlockIntoFragments(item, blockIdx, budget, mode, marker, indent) {
+    const block = item.children[blockIdx];
+    const content = renderStandaloneListItemBlockContent(block, marker, indent, mode);
+
+    if (content.length <= budget) {
+        return [{
+            content,
+            cursorStart: findFirstLeafCursorRel(item, [blockIdx]),
+            cursorEnd: findLastLeafCursorRel(item, [blockIdx]),
+        }];
+    }
+
+    const innerBudget = budget - marker.length;
+    if (innerBudget <= 0) return null;
+
+    if (block.type === 'paragraph') {
+        const paraFrags = splitParagraphIntoFragments(block, innerBudget, mode);
+        if (!paraFrags) return null;
+
+        return paraFrags.map(frag => ({
+            content: marker + frag.content,
+            cursorStart: { path: [blockIdx, ...frag.cursorStart.path], offsetUtf16: frag.cursorStart.offsetUtf16 },
+            cursorEnd: { path: [blockIdx, ...frag.cursorEnd.path], offsetUtf16: frag.cursorEnd.offsetUtf16 },
+        }));
+    }
+
+    return null;
+}
+
 function splitListItemIntoFragments(item, budget, mode) {
     const marker = (item.marker || '-') + ' ';
     const indent = '  ';
 
     if (item.children.length === 0) return null;
 
-    // Render first block with marker
-    const firstBlockContent = renderBlocks([item.children[0]], mode);
-    const firstLine = marker + firstBlockContent;
+    const fragments = [];
+    const firstBlockFragments = splitStandaloneListItemBlockIntoFragments(item, 0, budget, mode, marker, indent);
+    if (!firstBlockFragments) return null;
 
-    if (firstLine.length > budget) {
-        // First block with marker doesn't fit — split the inner block
-        const innerBudget = budget - marker.length;
-        if (innerBudget <= 0) return null;
+    let current = '';
+    let currentStartBlock = 0;
 
-        if (item.children[0].type === 'paragraph') {
-            const paraFrags = splitParagraphIntoFragments(item.children[0], innerBudget, mode);
-            if (!paraFrags) return null;
-            const fragments = [];
-            for (let p = 0; p < paraFrags.length; p++) {
-                fragments.push({
-                    content: marker + paraFrags[p].content,
-                    cursorStart: { path: [0, ...paraFrags[p].cursorStart.path], offsetUtf16: paraFrags[p].cursorStart.offsetUtf16 },
-                    cursorEnd: { path: [0, ...paraFrags[p].cursorEnd.path], offsetUtf16: paraFrags[p].cursorEnd.offsetUtf16 },
-                });
-            }
-            // Remaining inner blocks as continuation
-            for (let b = 1; b < item.children.length; b++) {
-                const cont = renderBlocks([item.children[b]], mode);
-                const indented = cont.split('\n').map(l => indent + l).join('\n');
-                fragments.push({
-                    content: marker + indented,
-                    cursorStart: findFirstLeafCursorRel(item, [b]),
-                    cursorEnd: findLastLeafCursorRel(item, [b]),
-                });
-            }
-            return fragments;
-        }
-        return null;
+    if (firstBlockFragments.length === 1) {
+        current = firstBlockFragments[0].content;
+    } else {
+        fragments.push(...firstBlockFragments);
+        currentStartBlock = 1;
     }
 
     // First block fits with marker; try adding more inner blocks
-    const fragments = [];
-    let current = firstLine;
-    let currentStartBlock = 0;
-
     for (let b = 1; b < item.children.length; b++) {
         const cont = renderBlocks([item.children[b]], mode);
         const indented = cont.split('\n').map(l => indent + l).join('\n');
+        const standaloneFragments = splitStandaloneListItemBlockIntoFragments(item, b, budget, mode, marker, indent);
+        if (!standaloneFragments) return null;
+
+        if (!current) {
+            if (standaloneFragments.length === 1) {
+                current = standaloneFragments[0].content;
+                currentStartBlock = b;
+            } else {
+                fragments.push(...standaloneFragments);
+                currentStartBlock = b + 1;
+            }
+            continue;
+        }
+
         const combined = current + '\n' + indented;
 
         if (combined.length > budget) {
@@ -614,8 +638,15 @@ function splitListItemIntoFragments(item, budget, mode) {
                 cursorStart: findFirstLeafCursorRel(item, [currentStartBlock]),
                 cursorEnd: findLastLeafCursorRel(item, [b - 1]),
             });
-            current = marker + indented.trimStart();
-            currentStartBlock = b;
+
+            if (standaloneFragments.length === 1) {
+                current = standaloneFragments[0].content;
+                currentStartBlock = b;
+            } else {
+                fragments.push(...standaloneFragments);
+                current = '';
+                currentStartBlock = b + 1;
+            }
         } else {
             current = combined;
         }
