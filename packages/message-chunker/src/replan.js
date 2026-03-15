@@ -216,8 +216,17 @@ function translatePathFromTrimmedNode(node, trimPath, trimOffset, localPath) {
 
 function isEffectivelyEmptyBlock(block) {
     if (!block) return true;
-    if (block.value !== undefined) {
-        return String(block.value).length === 0;
+    if (Object.prototype.hasOwnProperty.call(block, 'value')) {
+        if (block.value === null || block.value === undefined) {
+            return true;
+        }
+        if (typeof block.value === 'string') {
+            return block.value.length === 0;
+        }
+        if (typeof block.value === 'number') {
+            return false;
+        }
+        return true;
     }
     if (block.children) {
         return block.children.every(child => isEffectivelyEmptyBlock(child));
