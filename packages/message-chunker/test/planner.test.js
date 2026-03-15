@@ -554,3 +554,51 @@ describe('planner — list_item continuation semantics', () => {
         }
     });
 });
+
+describe('planner — splitBlockTypes semantics', () => {
+    it('keeps splitBlockTypes unique when the same block type is split multiple times', () => {
+        const md = 'Word. '.repeat(100);
+        const result = plan(md, {
+            preferredMode: 'auto',
+            strategy: 'preserve',
+            transport: { safeTextBudget: 200 },
+        });
+
+        assert.deepEqual(
+            result.diagnostics.splitBlockTypes,
+            ['paragraph'],
+            `expected unique splitBlockTypes, got ${JSON.stringify(result.diagnostics.splitBlockTypes)}`
+        );
+    });
+
+    it('reports splitBlockTypes in order of first actual split', () => {
+        const md = '> ' + 'quoted text. '.repeat(30) + '\n\n' + 'tail '.repeat(120);
+        const result = plan(md, {
+            preferredMode: 'auto',
+            strategy: 'preserve',
+            transport: { safeTextBudget: 200 },
+        });
+
+        assert.deepEqual(
+            result.diagnostics.splitBlockTypes,
+            ['quote', 'paragraph'],
+            `expected split order ["quote", "paragraph"], got ${JSON.stringify(result.diagnostics.splitBlockTypes)}`
+        );
+    });
+
+    it('does not add degraded-only unsupported constructs to splitBlockTypes', () => {
+        const rawHtml = plan('<b>x</b>', {
+            preferredMode: 'rich-html',
+            strategy: 'preserve',
+            transport: { safeTextBudget: 500 },
+        });
+        const table = plan('| A | B |\n| - | - |\n| 1 | 2 |', {
+            preferredMode: 'plain-text',
+            strategy: 'preserve',
+            transport: { safeTextBudget: 500 },
+        });
+
+        assert.deepEqual(rawHtml.diagnostics.splitBlockTypes, []);
+        assert.deepEqual(table.diagnostics.splitBlockTypes, []);
+    });
+});

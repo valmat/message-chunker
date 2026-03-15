@@ -53,7 +53,7 @@
 
 ---
 
-### 3. [x] Семаника continuation у `list_item`
+### 3. [x] Семантика continuation у `list_item`
 
 **Почему важно**
 - RFC требует по возможности повторять marker в continuation fragment.
@@ -87,7 +87,7 @@
 
 ## Средний приоритет
 
-### 5. Полная семаника `splitBlockTypes`
+### 5. [x] Полная семаника `splitBlockTypes`
 
 **Почему важно**
 - RFC требует, чтобы `splitBlockTypes` был:
