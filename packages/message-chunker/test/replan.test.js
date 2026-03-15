@@ -612,7 +612,9 @@ function pathAndOffsetEqual(a, b) {
 
 describe('replanTail — invalid-markup end-to-end', () => {
     it('rebuilds the undelivered rich-html tail as plain-text without duplicating delivered prefix', () => {
-        const md = '**bold** text here. '.repeat(15) + '\n\n' + 'More text here. '.repeat(15);
+        const richSeq = Array.from({ length: 18 }, (_, i) => `**B${String(i).padStart(2, '0')}** text here.`).join(' ');
+        const tailSeq = Array.from({ length: 18 }, (_, i) => `Tail ${String(i).padStart(2, '0')} here.`).join(' ');
+        const md = richSeq + '\n\n' + tailSeq;
         const budget = 200;
         const original = plan(md, {
             preferredMode: 'auto',
@@ -622,9 +624,8 @@ describe('replanTail — invalid-markup end-to-end', () => {
         assert.ok(original.chunks.length >= 3, `expected multipart rich-html plan, got ${original.chunks.length} chunk(s)`);
         assert.equal(original.diagnostics.usedMode, 'rich-html');
         assert.equal(original.chunks[0].mode, 'rich-html');
-        assert.match(original.chunks[0].content, /<b>bold<\/b>/);
+        assert.match(original.chunks[0].content, /<b>B00<\/b>/);
 
-        const deliveredPrefix = original.chunks[0].content;
         const tail = replan(md, original, 1, {
             preferredMode: 'plain-text',
             nextStrategy: 'preserve',
@@ -642,7 +643,8 @@ describe('replanTail — invalid-markup end-to-end', () => {
         }
 
         const tailFull = tail.chunks.map(chunk => chunk.content).join('');
-        assert.ok(!tailFull.includes(deliveredPrefix), 'tail should not duplicate already-delivered rich-html prefix');
-        assert.ok(tailFull.includes('bold text here.'), 'expected plain-text tail content after markup degradation');
+        assert.ok(!tailFull.includes('B00 text here.'), 'tail should not duplicate the already-delivered semantic prefix');
+        assert.ok(!tailFull.includes('B01 text here.'), 'tail should not duplicate early delivered content after markup degradation');
+        assert.ok(tailFull.includes('B09 text here.'), 'expected undelivered content to remain after plain-text replanning');
     });
 });
