@@ -23,6 +23,8 @@ npm install message-chunker
 
 Requires Node.js >= 18.
 
+This package is **ESM-only**. Use `import` / `export`, not CommonJS `require()`.
+
 ## Quick start
 
 ```js
@@ -195,6 +197,14 @@ These are **not** module-level reject reasons. The integration layer must decide
 
 ```bash
 npm test
+```
+
+## Development
+
+```bash
+npm install
+npm test
+npm run pack:check
 ```
 
 ## License
