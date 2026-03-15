@@ -73,8 +73,8 @@ _Источник истины до синхронизации кода: `docs/r
 - [x] После исправления проблем синхронизировать/расширить regression-тесты так, чтобы новые найденные кейсы оставались закрытыми навсегда: oversized `list_item`, forced-split `heading`, `replanTail()` по заголовку, degradation diagnostics, validation errors; см. `issues.md` и текущие красные тесты.
 
 #### Nice-to-have
-- [ ] Улучшить soft-splitting для oversized не-параграфных children внутри `list_item` (`quote`, nested `list`, `code_block`): сейчас они корректно эскалируют стратегию, но могут деградировать раньше, чем строго необходимо.
-- [ ] Уточнить детекцию unsupported pipe-table для diagnostics: текущая regex-эвристика по сырому markdown может давать false positive внутри fenced code block и других нетабличных контекстов; по возможности опираться на token/context-aware detection.
+- [x] Улучшить soft-splitting для oversized не-параграфных children внутри `list_item` (`quote`, nested `list`, `code_block`) — сознательно отложено: кейс признан редким для v1, текущее поведение корректно по доставке, а более ранняя деградация форматирования зафиксирована в `docs/known-limitations.md`.
+- [x] Уточнить детекцию unsupported pipe-table для diagnostics — сознательно отложено: редкие false positive в diagnostics внутри fenced code block и похожих контекстов признаны допустимым ограничением v1; перенос в `docs/known-limitations.md`.
 
 ### Выполнено в предыдущей итерации
 
@@ -106,10 +106,10 @@ _Источник истины до синхронизации кода: `docs/r
 - [ ] Пересмотреть семантику diagnostics для unsupported markdown после закрытия критичных багов: сейчас это уже оформлено как конкретная открытая задача выше, поэтому сюда относится только возможная последующая полировка структуры diagnostics и observability.
 
 ### Definition of done для следующей итерации
-- [ ] Ни один путь планирования не возвращает чанк длиннее `safeTextBudget`.
-- [ ] `heading` не вызывает дублирование уже доставленного текста при `replanTail()`.
-- [ ] `sourceRange` корректен для forced-split фрагментов, в том числе для длинных заголовков.
-- [ ] `planDelivery()` явно валидирует `strategy` и `preferredMode`.
-- [ ] `hadDegradation` отражает понижение unsupported markdown до текстового представления.
-- [ ] Все добавленные regression-тесты становятся зелёными и остаются в suite.
+- [x] Ни один путь планирования не возвращает чанк длиннее `safeTextBudget`.
+- [x] `heading` не вызывает дублирование уже доставленного текста при `replanTail()`.
+- [x] `sourceRange` корректен для forced-split фрагментов, в том числе для длинных заголовков.
+- [x] `planDelivery()` явно валидирует `strategy` и `preferredMode`.
+- [x] `hadDegradation` отражает понижение unsupported markdown до текстового представления.
+- [x] Все добавленные regression-тесты становятся зелёными и остаются в suite.
 - [ ] После закрытия текущих функциональных проблем добрать недостающее тестовое покрытие по списку из `missing-tests.md`.
