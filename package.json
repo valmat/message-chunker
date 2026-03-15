@@ -1,17 +1,31 @@
 {
-  "name": "message-chunker-monorepo",
+  "name": "message-chunker",
+  "version": "0.1.0",
   "private": true,
-  "workspaces": [
-    "packages/*"
+  "description": "Safe preparation module for splitting long rich-text (Markdown) messages for delivery through transports with message length limits.",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": "./src/index.js",
+  "files": [
+    "src"
   ],
-  "author": "",
+  "keywords": [
+    "chunk",
+    "split",
+    "message",
+    "text",
+    "markdown"
+  ],
   "license": "MIT",
-  "scripts": {
-    "test": "node --test",
-    "test:pkg": "node --test packages/message-chunker/test/*.js",
-    "coverage": "node --experimental-test-coverage --test packages/message-chunker/test/*.js"
-  },
   "engines": {
     "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test",
+    "coverage": "node --experimental-test-coverage --test",
+    "pack:check": "npm pack --dry-run"
+  },
+  "dependencies": {
+    "markdown-it": "^14.1.1"
   }
 }
