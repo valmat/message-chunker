@@ -47,6 +47,7 @@
  * @property {string} [lang]         - language info for code_block
  * @property {string} [href]         - URL for link nodes
  * @property {string} [marker]       - list item marker (-, *, 1., 2., etc.)
+ * @property {{ hadUnsupportedDegradation?: boolean }} [meta]
  */
 
 // --- Transport Profile ---

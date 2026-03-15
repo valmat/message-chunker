@@ -67,7 +67,7 @@ _Источник истины до синхронизации кода: `docs/r
 
 #### Высоко
 - [x] Явно валидировать входные `strategy` и `preferredMode` в `planDelivery()`, чтобы API не принимал мусорные значения молча и не падал общей internal error; см. `issues.md` (п. 4).
-- [ ] Довести diagnostics до полного соответствия RFC для unsupported markdown: raw HTML / tables / другие lowered-to-text конструкции должны выставлять `hadDegradation = true`; см. `rfc_violations.md` (п. 3) и `issues.md` (п. 5).
+- [x] Довести diagnostics до полного соответствия RFC для unsupported markdown: raw HTML / tables / другие lowered-to-text конструкции должны выставлять `hadDegradation = true`; см. `rfc_violations.md` (п. 3) и `issues.md` (п. 5).
 
 #### Средне
 - [ ] После исправления проблем синхронизировать/расширить regression-тесты так, чтобы новые найденные кейсы оставались закрытыми навсегда: oversized `list_item`, forced-split `heading`, `replanTail()` по заголовку, degradation diagnostics, validation errors; см. `issues.md` и текущие красные тесты.

@@ -1419,10 +1419,12 @@ function finalizeChunks(chunkData, ir, blockOffset = 0) {
 
 function buildDiagnostics(request, ir, chunks, usedStrategy, usedMode, splitBlockTypes = []) {
     const plainEstimate = renderBlocks(ir.children, 'plain-text').length;
-    const hadDegradation = usedStrategy !== request.strategy ||
-        (usedMode === 'plain-text' && request.preferredMode !== 'plain-text');
     const degradedToPlainText = usedMode === 'plain-text' &&
         request.preferredMode !== 'plain-text';
+    const hadDegradation = usedStrategy !== request.strategy ||
+        degradedToPlainText ||
+        splitBlockTypes.length > 0 ||
+        ir.meta?.hadUnsupportedDegradation === true;
 
     return {
         sourceLength: request.markdown.length,

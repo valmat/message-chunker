@@ -12,10 +12,37 @@ import { parse } from './parser.js';
 export function normalize(markdown) {
     const tokens = parse(markdown);
     const children = normalizeBlocks(tokens, 0, tokens.length);
-    return { type: 'root', children };
+    return {
+        type: 'root',
+        children,
+        meta: {
+            hadUnsupportedDegradation: detectUnsupportedDegradation(markdown, tokens),
+        },
+    };
 }
 
 // --------------- block-level normalization ---------------
+
+function detectUnsupportedDegradation(markdown, tokens) {
+    return hasUnsupportedToken(tokens) || looksLikeUnsupportedTable(markdown);
+}
+
+function hasUnsupportedToken(tokens) {
+    for (const token of tokens) {
+        if (token.type === 'html_block' || token.type === 'html_inline' || token.type === 'image') {
+            return true;
+        }
+        if (token.children && hasUnsupportedToken(token.children)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function looksLikeUnsupportedTable(markdown) {
+    return /(?:^|\n)\|.+\|\n\|[\s:|-]+\|(?:\n\|.*\|)*/m.test(markdown);
+}
+
 
 /**
  * Find the matching close token for an open token.
