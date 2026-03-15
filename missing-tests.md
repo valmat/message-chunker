@@ -116,7 +116,7 @@
 
 ## Низкий приоритет / nice-to-have
 
-### 7. [ ] Более точные golden tests для `SourceRange`
+### 7. [x] Более точные golden tests для `SourceRange`
 
 **Почему важно**
 - Сейчас есть тесты на стабильность и на некоторые intra-block cases.
@@ -124,8 +124,8 @@
 
 **Что стоит проверить**
 - [x] ожидаемые `path`/`offsetUtf16` для нескольких заранее подготовленных сложных входов;
-- [ ] exact `SourceRange` golden для rich-html intra-block split с inline markup/link;
-- [ ] golden на более сложный nested cursor-path внутри `quote -> list -> paragraph` именно вместе с `replanTail()`.
+- [x] exact `SourceRange` golden для rich-html intra-block split с inline markup/link;
+- [x] golden на более сложный nested cursor-path внутри `quote -> list -> paragraph` именно вместе с `replanTail()`.
 
 **Примечание**
 - Это не релиз-блокер при текущем покрытии, а полезный дополнительный слой hardening, чтобы ещё сильнее зацементировать адресацию.
@@ -133,7 +133,7 @@
 
 ---
 
-### 8. [ ] Unsupported markdown: footnotes / directives / exotic nesting
+### 8. [x] Unsupported markdown: footnotes / directives / exotic nesting
 
 **Почему важно**
 - RFC явно перечисляет unsupported constructs, которые должны либо понижаться до ближайшей поддерживаемой формы, либо превращаться в plain text с сохранением порядка текста.
@@ -142,12 +142,12 @@
 **Что стоит проверить**
 - [x] footnote-like markdown не создаёт “магической” структуры и остаётся в линейном тексте;
 - [x] directive-like syntax (`::note`, `:::`, и т.п.) не ломает IR и рендерится как текст;
-- [ ] exotic nested constructs упрощаются детерминированно и без потери порядка текста.
+- [x] exotic nested constructs упрощаются детерминированно и без потери порядка текста.
 
 **Полезные тесты**
 - [x] normalizer + renderers на `note[^1]\n\n[^1]: footnote text`;
 - [x] normalizer + renderers на block/inline directive-like syntax;
-- [ ] один смешанный case с quote/list/code + unsupported syntax внутри.
+- [x] один смешанный case с quote/list/code + unsupported syntax внутри.
 
 ---
 
@@ -169,7 +169,7 @@
 
 ---
 
-### 10. [ ] Более явные tests на UTF-16 semantics для `SourceRange` и длин
+### 10. [x] Более явные tests на UTF-16 semantics для `SourceRange` и длин
 
 **Почему важно**
 - RFC нормативно фиксирует `string.length` / UTF-16 code units как семантику длины и offsets.
@@ -177,13 +177,13 @@
 
 **Что стоит проверить**
 - [x] offsets двигаются по UTF-16 code units на emoji / surrogate pairs;
-- [ ] `estimatedLength === content.length` для чанков с tricky Unicode;
-- [ ] intra-block split и `replanTail()` сохраняют точные UTF-16 offsets в Unicode-heavy тексте.
+- [x] `estimatedLength === content.length` для чанков с tricky Unicode;
+- [x] intra-block split и `replanTail()` сохраняют точные UTF-16 offsets в Unicode-heavy тексте.
 
 **Полезные тесты**
 - [x] golden на forced split строки из emoji и ASCII;
-- [ ] replan case, где reject попадает внутрь Unicode-heavy paragraph;
-- [ ] expected offsets на комбинации `emoji + combining marks + plain text`.
+- [x] replan case, где reject попадает внутрь Unicode-heavy paragraph;
+- [x] expected offsets на комбинации `emoji + combining marks + plain text`.
 
 ---
 

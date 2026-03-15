@@ -174,6 +174,58 @@ describe('renderer-html — thematic break', () => {
     });
 });
 
+describe('renderers — unsupported exotic nesting fallbacks', () => {
+    it('keeps deterministic text order for quote/list/code with unsupported syntax inside', () => {
+        const md = [
+            '> ::note',
+            '> quoted [^1] bit',
+            '>',
+            '> - nested item with <span>raw</span> and [^2]',
+            '>',
+            '> ```js',
+            '> const x = "<b>tag</b>";',
+            '> ```',
+            '',
+            '[^1]: footnote one',
+            '[^2]: footnote two',
+        ].join('\n');
+
+        const ir = normalize(md);
+        const html = renderHtml(ir.children);
+        const plain = renderPlain(ir.children);
+
+        assert.equal(ir.children[0].type, 'quote');
+        assert.deepEqual(
+            ir.children[0].children.map(child => child.type),
+            ['paragraph', 'list', 'code_block']
+        );
+        assert.equal(
+            html,
+            '&gt; ::note\n' +
+            '&gt; quoted [^1] bit\n' +
+            '&gt;\n' +
+            '&gt; - nested item with &lt;span&gt;raw&lt;/span&gt; and [^2]\n' +
+            '&gt;\n' +
+            '&gt; <pre><code class="language-js">const x = &quot;&lt;b&gt;tag&lt;/b&gt;&quot;;</code></pre>\n\n' +
+            '[^1]: footnote one\n' +
+            '[^2]: footnote two'
+        );
+        assert.equal(
+            plain,
+            '> ::note\n' +
+            '> quoted [^1] bit\n' +
+            '>\n' +
+            '> - nested item with <span>raw</span> and [^2]\n' +
+            '>\n' +
+            '> ```js\n' +
+            '> const x = "<b>tag</b>";\n' +
+            '> ```\n\n' +
+            '[^1]: footnote one\n' +
+            '[^2]: footnote two'
+        );
+    });
+});
+
 describe('renderer-html — block spacing', () => {
     it('all block types have correct spacing', () => {
         const md = '# Title\n\nParagraph\n\n- item\n\n> quote\n\n```\ncode\n```\n\n---\n\nEnd';

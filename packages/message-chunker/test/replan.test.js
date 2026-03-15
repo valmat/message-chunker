@@ -725,4 +725,69 @@ describe('replanTail — node-boundary sourceRange invariants', () => {
         assert.equal(tail.chunks[0].content, original.chunks[1].content);
         assert.deepEqual(tail.chunks[0].sourceRange, original.chunks[1].sourceRange);
     });
+
+    it('keeps exact nested quote/list/paragraph sourceRange paths after replan', () => {
+        const md = [
+            '> - intro alpha beta gamma delta. alpha beta gamma delta. alpha beta gamma delta. alpha beta gamma delta. alpha beta gamma delta. alpha beta gamma delta. alpha beta gamma delta. alpha beta gamma delta.',
+            '>   second para tail tail tail tail tail tail tail tail',
+            '>',
+            '> - next item short',
+        ].join('\n');
+        const original = plan(md, {
+            preferredMode: 'plain-text',
+            strategy: 'split-blocks-soft',
+            transport: { safeTextBudget: 200 },
+        });
+
+        assert.equal(original.chunks.length, 2);
+        assert.deepEqual(original.chunks[1].sourceRange, {
+            start: { path: [0, 0, 0, 0, 0], offsetUtf16: 190 },
+            end: { path: [0, 0, 1, 0, 0], offsetUtf16: 15 },
+        });
+
+        const tail = replan(md, original, 1, {
+            preferredMode: 'plain-text',
+            nextStrategy: 'split-blocks-soft',
+            transport: { safeTextBudget: 200 },
+            rejectReason: 'too-long',
+        });
+
+        assert.equal(tail.chunks.length, 1);
+        assert.equal(tail.chunks[0].content, '> -  delta.\n> second para tail tail tail tail tail tail tail tail\n> - next item short');
+        assert.deepEqual(tail.chunks[0].sourceRange, {
+            start: { path: [0, 0, 0, 0, 0], offsetUtf16: 190 },
+            end: { path: [0, 0, 1, 0, 0], offsetUtf16: 15 },
+        });
+    });
+
+    it('keeps exact UTF-16 offsets when replanning a Unicode-heavy paragraph tail', () => {
+        const md = ('😀e\u0301Z ').repeat(50);
+        const original = plan(md, {
+            preferredMode: 'plain-text',
+            strategy: 'split-blocks-soft',
+            transport: { safeTextBudget: 200 },
+        });
+
+        assert.equal(original.chunks.length, 2);
+        assert.deepEqual(original.chunks[1].sourceRange, {
+            start: { path: [0, 0], offsetUtf16: 198 },
+            end: { path: [0, 0], offsetUtf16: 299 },
+        });
+        assert.equal(original.chunks[1].estimatedLength, original.chunks[1].content.length);
+
+        const tail = replan(md, original, 1, {
+            preferredMode: 'plain-text',
+            nextStrategy: 'split-blocks-soft',
+            transport: { safeTextBudget: 200 },
+            rejectReason: 'too-long',
+        });
+
+        assert.equal(tail.chunks.length, 1);
+        assert.equal(tail.chunks[0].content, original.chunks[1].content);
+        assert.equal(tail.chunks[0].estimatedLength, tail.chunks[0].content.length);
+        assert.deepEqual(tail.chunks[0].sourceRange, {
+            start: { path: [0, 0], offsetUtf16: 198 },
+            end: { path: [0, 0], offsetUtf16: 299 },
+        });
+    });
 });

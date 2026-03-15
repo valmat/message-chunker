@@ -555,6 +555,37 @@ describe('golden — exact sourceRange addresses', () => {
             ]
         );
     });
+
+    it('rich-html intra-block split keeps exact sourceRange through strong and link inline nodes', () => {
+        const md = '**BoldStart** middle [LinkLabel](https://example.com/path?q=1&x=2) tail '.repeat(3);
+        const result = plan(md, {
+            preferredMode: 'rich-html',
+            strategy: 'split-blocks-soft',
+            transport: { safeTextBudget: 200 },
+        });
+
+        assert.equal(result.diagnostics.usedStrategy, 'split-blocks-soft');
+        assert.equal(result.diagnostics.usedMode, 'rich-html');
+        assert.equal(result.chunks.length, 2);
+        assert.deepEqual(
+            result.chunks.map(chunk => chunk.sourceRange),
+            [
+                {
+                    start: { path: [0, 0, 0], offsetUtf16: 0 },
+                    end: { path: [0, 9], offsetUtf16: 4 },
+                },
+                {
+                    start: { path: [0, 9], offsetUtf16: 4 },
+                    end: { path: [0, 11], offsetUtf16: 5 },
+                },
+            ]
+        );
+        assert.equal(result.chunks[0].estimatedLength, result.chunks[0].content.length);
+        assert.equal(result.chunks[1].estimatedLength, result.chunks[1].content.length);
+        assert.ok(result.chunks[0].content.includes('<b>BoldStart</b>'));
+        assert.ok(result.chunks[0].content.includes('<a href="https://example.com/path?q=1&amp;x=2">LinkLabel</a>'));
+        assert.ok(result.chunks[1].content.startsWith('dle <a href="https://example.com/path?q=1&amp;x=2">LinkLabel</a>'));
+    });
 });
 
 describe('golden — UTF-16 sourceRange semantics', () => {
@@ -580,5 +611,34 @@ describe('golden — UTF-16 sourceRange semantics', () => {
                 },
             ]
         );
+    });
+
+    it('emoji, combining marks, and ASCII keep UTF-16 offsets and exact estimated lengths', () => {
+        const md = ('😀e\u0301Z ').repeat(50);
+        const result = plan(md, {
+            preferredMode: 'plain-text',
+            strategy: 'split-blocks-soft',
+            transport: { safeTextBudget: 200 },
+        });
+
+        assert.equal(result.diagnostics.usedStrategy, 'split-blocks-soft');
+        assert.deepEqual(
+            result.chunks.map(chunk => chunk.sourceRange),
+            [
+                {
+                    start: { path: [0, 0], offsetUtf16: 0 },
+                    end: { path: [0, 0], offsetUtf16: 198 },
+                },
+                {
+                    start: { path: [0, 0], offsetUtf16: 198 },
+                    end: { path: [0, 0], offsetUtf16: 299 },
+                },
+            ]
+        );
+        for (const chunk of result.chunks) {
+            assert.equal(chunk.estimatedLength, chunk.content.length);
+        }
+        assert.equal(result.chunks[0].content.length, 197);
+        assert.equal(result.chunks[1].content.length, 101);
     });
 });
