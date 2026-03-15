@@ -473,3 +473,86 @@ describe('determinism — complex input', () => {
         assert.deepEqual(r1.diagnostics, r2.diagnostics);
     });
 });
+
+describe('golden — exact sourceRange addresses', () => {
+    it('forced-split heading keeps exact sequential UTF-16 offsets in one text leaf', () => {
+        const md = '# ' + Array.from({ length: 120 }, (_, i) => `word${String(i).padStart(3, '0')}`).join(' ');
+        const result = plan(md, {
+            preferredMode: 'plain-text',
+            strategy: 'forced-plain-text',
+            transport: { safeTextBudget: 200 },
+        });
+
+        assert.equal(result.diagnostics.usedStrategy, 'forced-plain-text');
+        assert.deepEqual(
+            result.chunks.map(chunk => chunk.sourceRange),
+            [
+                { start: { path: [0, 0], offsetUtf16: 0 }, end: { path: [0, 0], offsetUtf16: 199 } },
+                { start: { path: [0, 0], offsetUtf16: 199 }, end: { path: [0, 0], offsetUtf16: 398 } },
+                { start: { path: [0, 0], offsetUtf16: 398 }, end: { path: [0, 0], offsetUtf16: 597 } },
+                { start: { path: [0, 0], offsetUtf16: 597 }, end: { path: [0, 0], offsetUtf16: 796 } },
+                { start: { path: [0, 0], offsetUtf16: 796 }, end: { path: [0, 0], offsetUtf16: 959 } },
+            ]
+        );
+    });
+
+    it('split list continuation moves sourceRange from first to second paragraph inside list_item', () => {
+        const md = '- intro ' + 'one two three four. '.repeat(8) + '\n\n  second para ' + 'five six seven eight. '.repeat(8);
+        const result = plan(md, {
+            preferredMode: 'plain-text',
+            strategy: 'split-blocks-soft',
+            transport: { safeTextBudget: 200 },
+        });
+
+        assert.equal(result.diagnostics.usedStrategy, 'split-blocks-soft');
+        assert.deepEqual(
+            result.chunks.map(chunk => chunk.sourceRange),
+            [
+                {
+                    start: { path: [0, 0, 0, 0], offsetUtf16: 0 },
+                    end: { path: [0, 0, 0, 0], offsetUtf16: 165 },
+                },
+                {
+                    start: { path: [0, 0, 1, 0], offsetUtf16: 0 },
+                    end: { path: [0, 0, 1, 0], offsetUtf16: 187 },
+                },
+            ]
+        );
+    });
+
+    it('split-blocks keeps exact block-level sourceRange boundaries for quote, list, and code block', () => {
+        const md = [
+            '> ' + 'quote first words. '.repeat(4),
+            '>',
+            '> ' + 'quote second words. '.repeat(4),
+            '',
+            '- ' + 'list words here. '.repeat(6),
+            '- second item short',
+            '',
+            '```js',
+            'const x = 1;',
+            'const y = 2;',
+            '```',
+        ].join('\n');
+        const result = plan(md, {
+            preferredMode: 'plain-text',
+            strategy: 'split-blocks',
+            transport: { safeTextBudget: 200 },
+        });
+
+        assert.equal(result.diagnostics.usedStrategy, 'split-blocks');
+        assert.deepEqual(
+            result.chunks.map(chunk => chunk.sourceRange),
+            [
+                {
+                    start: { path: [0, 0, 0], offsetUtf16: 0 },
+                    end: { path: [0, 1, 0], offsetUtf16: 79 },
+                },
+                {
+                    start: { path: [1, 0, 0, 0], offsetUtf16: 0 },
+                    end: { path: [2], offsetUtf16: 25 },
+                },
+            ]
+        );
+    });
+});

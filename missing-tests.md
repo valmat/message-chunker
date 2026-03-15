@@ -116,7 +116,7 @@
 
 ## Низкий приоритет / nice-to-have
 
-### 7. Более точные golden tests для `SourceRange`
+### 7. [x] Более точные golden tests для `SourceRange`
 
 **Почему важно**
 - Сейчас есть тесты на стабильность и на некоторые intra-block cases.
