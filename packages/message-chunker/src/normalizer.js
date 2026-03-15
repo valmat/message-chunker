@@ -11,6 +11,17 @@ import { parse } from './parser.js';
  */
 export function normalize(markdown) {
     const tokens = parse(markdown);
+    return _normalizeFromTokens(tokens, markdown);
+}
+
+/**
+ * Internal helper for tests and white-box normalization checks.
+ * Not part of the public package API.
+ * @param {object[]} tokens
+ * @param {string} [markdown='']
+ * @returns {import('./types.js').IRNode}
+ */
+export function _normalizeFromTokens(tokens, markdown = '') {
     const children = normalizeBlocks(tokens, 0, tokens.length);
     return {
         type: 'root',

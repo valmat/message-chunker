@@ -1,10 +1,6 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { describe, it } from 'node:test';
-import { normalize } from '../src/normalizer.js';
+import { normalize, _normalizeFromTokens } from '../src/normalizer.js';
 
 // Helper: get types of top-level children
 function topTypes(ir) {
@@ -20,29 +16,6 @@ function collectText(node) {
 
 function childTypes(node) {
     return (node.children || []).map(child => child.type);
-}
-
-
-async function withSyntheticParse(parseImpl) {
-    const sourcePath = path.resolve('packages/message-chunker/src/normalizer.js');
-    const original = fs.readFileSync(sourcePath, 'utf8');
-    const rewritten = original.replace(
-        "import { parse } from './parser.js';",
-        'const parse = globalThis.__TEST_PARSE__;',
-    );
-
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'message-chunker-normalizer-'));
-    const tempFile = path.join(tempDir, 'normalizer.synthetic.mjs');
-    fs.writeFileSync(tempFile, rewritten);
-
-    globalThis.__TEST_PARSE__ = parseImpl;
-    try {
-        const mod = await import(pathToFileURL(tempFile).href + `?t=${Date.now()}`);
-        return mod.normalize;
-    } finally {
-        delete globalThis.__TEST_PARSE__;
-        fs.rmSync(tempDir, { recursive: true, force: true });
-    }
 }
 
 describe('normalizer — paragraphs', () => {
@@ -430,8 +403,8 @@ describe('normalizer — unsupported markdown fallbacks', () => {
 });
 
 describe('normalizer — synthetic fallback coverage', () => {
-    it('uses attrs fallback and survives missing list close tokens', async () => {
-        const normalizeSynthetic = await withSyntheticParse(() => [
+    it('uses attrs fallback and survives missing list close tokens', () => {
+        const ir = _normalizeFromTokens([
             { type: 'ordered_list_open', attrs: [['start', '3']] },
             { type: 'list_item_open', markup: '.' },
             { type: 'paragraph_open' },
@@ -439,9 +412,7 @@ describe('normalizer — synthetic fallback coverage', () => {
             { type: 'paragraph_close' },
             { type: 'list_item_close' },
             { type: 'dummy_tail' },
-        ]);
-
-        const ir = normalizeSynthetic('ignored');
+        ], 'ignored');
         const list = ir.children[0];
 
         assert.equal(list.type, 'list');
@@ -451,36 +422,32 @@ describe('normalizer — synthetic fallback coverage', () => {
         assert.equal(collectText(list.children[0]), 'third item');
     });
 
-    it('skips orphan block close tokens and converts block-level inline/unknown block to paragraphs', async () => {
-        const normalizeSynthetic = await withSyntheticParse(() => [
+    it('skips orphan block close tokens and converts block-level inline/unknown block to paragraphs', () => {
+        const ir = _normalizeFromTokens([
             { type: 'paragraph_close' },
             { type: 'inline', children: [{ type: 'text', content: 'loose inline' }] },
             { type: 'mystery_block', content: 'fallback block' },
-        ]);
-
-        const ir = normalizeSynthetic('ignored');
+        ], 'ignored');
 
         assert.deepEqual(topTypes(ir), ['paragraph', 'paragraph']);
         assert.equal(collectText(ir.children[0]), 'loose inline');
         assert.equal(collectText(ir.children[1]), 'fallback block');
     });
 
-    it('drops a single empty text leaf produced by inline fallback', async () => {
-        const normalizeSynthetic = await withSyntheticParse(() => [
+    it('drops a single empty text leaf produced by inline fallback', () => {
+        const ir = _normalizeFromTokens([
             { type: 'paragraph_open' },
             { type: 'inline', children: [{ type: 'text', content: '' }] },
             { type: 'paragraph_close' },
-        ]);
-
-        const ir = normalizeSynthetic('ignored');
+        ], 'ignored');
         const paragraph = ir.children[0];
 
         assert.equal(paragraph.type, 'paragraph');
         assert.deepEqual(paragraph.children, []);
     });
 
-    it('merges adjacent inline fallback text nodes and skips orphan inline closes', async () => {
-        const normalizeSynthetic = await withSyntheticParse(() => [
+    it('merges adjacent inline fallback text nodes and skips orphan inline closes', () => {
+        const ir = _normalizeFromTokens([
             {
                 type: 'paragraph_open',
             },
@@ -495,9 +462,7 @@ describe('normalizer — synthetic fallback coverage', () => {
                 ],
             },
             { type: 'paragraph_close' },
-        ]);
-
-        const ir = normalizeSynthetic('ignored');
+        ], 'ignored');
         const paragraph = ir.children[0];
 
         assert.deepEqual(childTypes(paragraph), ['text']);
