@@ -95,13 +95,31 @@ export function replanTail(request) {
         markdown,
     });
 
-    // Fix first chunk's sourceRange.start to the original cursor position
-    // (planFromIr computed cursors relative to the trimmed structure)
+    // Translate source ranges for chunks that still refer to the trimmed first block.
+    // planFromIr computed these cursors relative to the trimmed structure; convert them
+    // back to full-IR coordinates so both start and end remain in the same address space.
     if (!atBlockStart && plan.chunks.length > 0) {
-        plan.chunks[0].sourceRange.start = {
-            path: [...startCursor.path],
-            offsetUtf16: startCursor.offsetUtf16,
-        };
+        const trimPath = startCursor.path.slice(1);
+        for (const chunk of plan.chunks) {
+            if (chunk.sourceRange.start.path[0] === blockIdx) {
+                chunk.sourceRange.start = translateCursorFromTrimmedBlock(
+                    block,
+                    trimPath,
+                    startCursor.offsetUtf16,
+                    blockIdx,
+                    chunk.sourceRange.start,
+                );
+            }
+            if (chunk.sourceRange.end.path[0] === blockIdx) {
+                chunk.sourceRange.end = translateCursorFromTrimmedBlock(
+                    block,
+                    trimPath,
+                    startCursor.offsetUtf16,
+                    blockIdx,
+                    chunk.sourceRange.end,
+                );
+            }
+        }
     }
 
     return {
@@ -136,6 +154,48 @@ function pathEquals(a, b) {
         if (a[i] !== b[i]) return false;
     }
     return true;
+}
+
+
+function translateCursorFromTrimmedBlock(block, trimPath, trimOffset, blockIdx, cursor) {
+    const localPath = cursor.path.slice(1);
+    const translatedRelPath = translatePathFromTrimmedNode(block, trimPath, trimOffset, localPath);
+    const translatedOffset = pathEquals(translatedRelPath, trimPath)
+        ? trimOffset + cursor.offsetUtf16
+        : cursor.offsetUtf16;
+
+    return {
+        path: [blockIdx, ...translatedRelPath],
+        offsetUtf16: translatedOffset,
+    };
+}
+
+function translatePathFromTrimmedNode(node, trimPath, trimOffset, localPath) {
+    if (localPath.length === 0) {
+        return [];
+    }
+
+    if (!node.children || trimPath.length === 0) {
+        return [...localPath];
+    }
+
+    const trimmedChildIndex = trimPath[0];
+    const localIndex = localPath[0];
+    const targetChild = node.children[trimmedChildIndex];
+    const trimmedTarget = trimBlockFromCursor(targetChild, trimPath.slice(1), trimOffset);
+
+    if (localIndex === 0 && trimmedTarget) {
+        return [
+            trimmedChildIndex,
+            ...translatePathFromTrimmedNode(targetChild, trimPath.slice(1), trimOffset, localPath.slice(1)),
+        ];
+    }
+
+    const originalIndex = trimmedTarget
+        ? trimmedChildIndex + localIndex
+        : trimmedChildIndex + localIndex + 1;
+
+    return [originalIndex, ...localPath.slice(1)];
 }
 
 // --------------- IR trimming ---------------
