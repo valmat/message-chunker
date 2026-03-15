@@ -172,6 +172,22 @@ describe('planner — split-blocks-soft', () => {
 // =============== plain-text strategy ===============
 
 describe('planner — plain-text strategy', () => {
+    it('long heading degrades to plain-text before forced-plain-text', () => {
+        const md = '# ' + 'word '.repeat(100);
+        const result = plan(md, {
+            preferredMode: 'rich-html',
+            strategy: 'preserve',
+            transport: { safeTextBudget: 200 },
+        });
+
+        assert.ok(result.chunks.length >= 2, `expected split heading, got ${result.chunks.length} chunks`);
+        assert.equal(result.diagnostics.usedStrategy, 'plain-text');
+        assert.equal(result.diagnostics.usedMode, 'plain-text');
+        for (const chunk of result.chunks) {
+            assert.ok(chunk.content.length <= 200, `chunk too long: ${chunk.content.length}`);
+        }
+    });
+
     it('code_block can be split in plain-text', () => {
         const code = '```\n' + 'line\n'.repeat(80) + '```';
         const result = plan(code, {

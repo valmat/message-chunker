@@ -243,6 +243,7 @@ function trySplitBlocksSoft(ir, mode, budget) {
 
 function canSplitBlock(block, mode) {
     if (block.type === 'paragraph') return true;
+    if (block.type === 'heading') return mode === 'plain-text';
     if (block.type === 'quote') return true;
     if (block.type === 'list') return true;
     if (block.type === 'list_item') return true;
@@ -260,6 +261,8 @@ function splitBlockIntoFragments(block, budget, mode) {
     switch (block.type) {
         case 'paragraph':
             return splitParagraphIntoFragments(block, budget, mode);
+        case 'heading':
+            return splitHeadingIntoFragments(block, budget, mode);
         case 'quote':
             return splitQuoteIntoFragments(block, budget, mode);
         case 'list':
@@ -271,6 +274,11 @@ function splitBlockIntoFragments(block, budget, mode) {
         default:
             return null;
     }
+}
+
+function splitHeadingIntoFragments(heading, budget, mode) {
+    if (mode !== 'plain-text') return null;
+    return splitParagraphIntoFragments({ type: 'paragraph', children: heading.children }, budget, mode);
 }
 
 // --------------- paragraph splitting ---------------
