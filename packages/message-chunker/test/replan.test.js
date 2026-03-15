@@ -701,3 +701,28 @@ describe('replanTail — strict sourceRange invariants', () => {
         assert.deepEqual(tail.chunks[0].sourceRange, original.chunks[1].sourceRange);
     });
 });
+
+describe('replanTail — node-boundary sourceRange invariants', () => {
+    it('same-strategy replan keeps exact sourceRange for code-block node-boundary cursors', () => {
+        const md = '```js\n' + 'x=1;\n'.repeat(80) + '```';
+        const original = plan(md, {
+            preferredMode: 'plain-text',
+            strategy: 'split-blocks-soft',
+            transport: { safeTextBudget: 200 },
+        });
+
+        assert.ok(original.chunks.length >= 3, `expected >= 3 chunks, got ${original.chunks.length}`);
+        assert.deepEqual(original.chunks[1].sourceRange.start.path, [0]);
+        assert.deepEqual(original.chunks[1].sourceRange.end.path, [0]);
+
+        const tail = replan(md, original, 1, {
+            preferredMode: 'plain-text',
+            nextStrategy: 'split-blocks-soft',
+            transport: { safeTextBudget: 200 },
+            rejectReason: 'too-long',
+        });
+
+        assert.equal(tail.chunks[0].content, original.chunks[1].content);
+        assert.deepEqual(tail.chunks[0].sourceRange, original.chunks[1].sourceRange);
+    });
+});

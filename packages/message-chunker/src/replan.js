@@ -172,6 +172,8 @@ function translateCursorFromTrimmedBlock(block, trimPath, trimOffset, blockIdx, 
 
 function translatePathFromTrimmedNode(node, trimPath, trimOffset, localPath) {
     if (localPath.length === 0) {
+        // Cursor points at the current node itself. For leaf blocks such as code_block,
+        // this intentionally stays as the block-level path [blockIdx] in full-IR coordinates.
         return [];
     }
 

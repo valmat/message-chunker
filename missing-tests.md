@@ -123,13 +123,13 @@
 - Можно усилить golden coverage для сложных структур: heading, list continuation, mixed quote/list/code cases.
 
 **Что стоит проверить**
-- ожидаемые `path`/`offsetUtf16` для нескольких заранее подготовленных сложных входов;
-- exact `SourceRange` golden для rich-html intra-block split с inline markup/link;
-- golden на более сложный nested cursor-path внутри `quote -> list -> paragraph` именно вместе с `replanTail()`.
+- [x] ожидаемые `path`/`offsetUtf16` для нескольких заранее подготовленных сложных входов;
+- [ ] exact `SourceRange` golden для rich-html intra-block split с inline markup/link;
+- [ ] golden на более сложный nested cursor-path внутри `quote -> list -> paragraph` именно вместе с `replanTail()`.
 
 **Примечание**
 - Это не релиз-блокер при текущем покрытии, а полезный дополнительный слой hardening, чтобы ещё сильнее зацементировать адресацию.
-- Частично уже усилено строгими тестами; сейчас есть выявленный gap: при `replanTail()` первый tail-chunk может сохранять `sourceRange.start` в координатах полного IR, но оставлять `sourceRange.end` в локальных координатах trimmed tail. Это уже воспроизводится тестами в `packages/message-chunker/test/replan.test.js`.
+- Частично уже усилено строгими тестами; найденный gap с рассинхроном `sourceRange.start/end` в `replanTail()` уже закрыт тестами и исправлением реализации.
 
 ---
 
@@ -140,32 +140,32 @@
 - Сейчас покрыты в основном `raw HTML`, `table` и `image`, но почти нет явных тестов на footnote-like syntax, directives и более экзотические вложенности.
 
 **Что стоит проверить**
-- footnote-like markdown не создаёт “магической” структуры и остаётся в линейном тексте;
-- directive-like syntax (`::note`, `:::`, и т.п.) не ломает IR и рендерится как текст;
-- exotic nested constructs упрощаются детерминированно и без потери порядка текста.
+- [x] footnote-like markdown не создаёт “магической” структуры и остаётся в линейном тексте;
+- [x] directive-like syntax (`::note`, `:::`, и т.п.) не ломает IR и рендерится как текст;
+- [ ] exotic nested constructs упрощаются детерминированно и без потери порядка текста.
 
 **Полезные тесты**
-- normalizer + renderers на `note[^1]\n\n[^1]: footnote text`;
-- normalizer + renderers на block/inline directive-like syntax;
-- один смешанный case с quote/list/code + unsupported syntax внутри.
+- [x] normalizer + renderers на `note[^1]\n\n[^1]: footnote text`;
+- [x] normalizer + renderers на block/inline directive-like syntax;
+- [ ] один смешанный case с quote/list/code + unsupported syntax внутри.
 
 ---
 
-### 9. [ ] Safe rich-html subset as a negative contract
+### 9. [x] Safe rich-html subset as a negative contract
 
 **Почему важно**
 - RFC требует, чтобы rich renderer генерировал только transport-safe HTML subset.
 - Сейчас тесты хорошо проверяют позитивные примеры (`<b>`, `<i>`, `<code>`, `<a>`, `<pre>`), но почти нет негативных контрактов “каких тегов/атрибутов не должно быть никогда”.
 
 **Что стоит проверить**
-- в rich-html не появляются произвольные теги вроде `<div>`, `<span>`, `<em>`, `<strong>`, `<blockquote>`, `<ul>`, `<ol>`, `<li>`;
-- ссылки не получают неожиданные атрибуты кроме `href`;
-- language-информация у code block остаётся только в `class="language-..."`.
+- [x] в rich-html не появляются произвольные теги вроде `<div>`, `<span>`, `<em>`, `<strong>`, `<blockquote>`, `<ul>`, `<ol>`, `<li>`;
+- [x] ссылки не получают неожиданные атрибуты кроме `href`;
+- [x] language-информация у code block остаётся только в `class="language-..."`.
 
 **Полезные тесты**
-- whitelist-style тест по regex для mixed markdown input;
-- отдельный тест, что raw HTML не просачивается как HTML-теги;
-- отдельный тест, что `a`-тег не получает лишние атрибуты.
+- [x] whitelist-style тест по regex для mixed markdown input;
+- [x] отдельный тест, что raw HTML не просачивается как HTML-теги;
+- [x] отдельный тест, что `a`-тег не получает лишние атрибуты.
 
 ---
 
@@ -176,14 +176,14 @@
 - Unicode split уже покрыт неплохо, но не хватает точных тестов, где одновременно проверяются `content.length`, `estimatedLength` и `sourceRange.offsetUtf16` на tricky Unicode.
 
 **Что стоит проверить**
-- offsets двигаются по UTF-16 code units на emoji / surrogate pairs;
-- `estimatedLength === content.length` для чанков с tricky Unicode;
-- intra-block split и `replanTail()` сохраняют точные UTF-16 offsets в Unicode-heavy тексте.
+- [x] offsets двигаются по UTF-16 code units на emoji / surrogate pairs;
+- [ ] `estimatedLength === content.length` для чанков с tricky Unicode;
+- [ ] intra-block split и `replanTail()` сохраняют точные UTF-16 offsets в Unicode-heavy тексте.
 
 **Полезные тесты**
-- golden на forced split строки из emoji и ASCII;
-- replan case, где reject попадает внутрь Unicode-heavy paragraph;
-- expected offsets на комбинации `emoji + combining marks + plain text`.
+- [x] golden на forced split строки из emoji и ASCII;
+- [ ] replan case, где reject попадает внутрь Unicode-heavy paragraph;
+- [ ] expected offsets на комбинации `emoji + combining marks + plain text`.
 
 ---
 
