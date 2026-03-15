@@ -1032,7 +1032,11 @@ The module must return diagnostics suitable for:
 
 Diagnostics must not be a mandatory part of the transport business logic, but must be available for logging and tests.
 
+For v1 diagnostics are intentionally minimalistic. They are primarily an observability and debugging surface, not a normative trigger for product behavior.
+
 If an unsupported block / markdown was lowered to a plain-text representation, or a continuation fragment of list_item had to be simplified to a paragraph, this must be reflected at least by hadDegradation = true and by the proper entries in splitBlockTypes where applicable.
+
+For v1 this minimal signal is sufficient. The implementation is not required to provide a more detailed taxonomy of degradation causes for unsupported markdown.
 
 Do not include into splitBlockTypes the constructs that were just degraded without an actual split. For example, unsupported markdown and raw HTML must not get there only because they were lowered or escaped.
 
