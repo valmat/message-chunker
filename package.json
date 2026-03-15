@@ -6,16 +6,30 @@
   "type": "module",
   "main": "./src/index.js",
   "exports": "./src/index.js",
+  "sideEffects": false,
   "files": [
     "src"
   ],
   "keywords": [
+    "message-chunker",
     "chunk",
+    "chunking",
     "split",
     "message",
     "text",
-    "markdown"
+    "markdown",
+    "telegram",
+    "html",
+    "plain-text"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/valmat/message-chunker.git"
+  },
+  "homepage": "https://github.com/valmat/message-chunker#readme",
+  "bugs": {
+    "url": "https://github.com/valmat/message-chunker/issues"
+  },
   "license": "MIT",
   "engines": {
     "node": ">=18"
@@ -23,7 +37,8 @@
   "scripts": {
     "test": "node --test",
     "coverage": "node --experimental-test-coverage --test",
-    "pack:check": "npm pack --dry-run"
+    "pack:check": "npm pack --dry-run",
+    "prepublishOnly": "npm test && npm run pack:check"
   },
   "dependencies": {
     "markdown-it": "^14.1.1"
