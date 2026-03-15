@@ -8,10 +8,10 @@
   "license": "MIT",
   "scripts": {
     "test": "node --test",
-    "test:pkg": "node --test packages/message-chunker/test/*.js"
+    "test:pkg": "node --test packages/message-chunker/test/*.js",
+    "coverage": "node --experimental-test-coverage --test packages/message-chunker/test/*.js"
   },
   "engines": {
     "node": ">=18"
   }
 }
-
