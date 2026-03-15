@@ -70,10 +70,11 @@ _Источник истины до синхронизации кода: `docs/r
 - [x] Довести diagnostics до полного соответствия RFC для unsupported markdown: raw HTML / tables / другие lowered-to-text конструкции должны выставлять `hadDegradation = true`; см. `rfc_violations.md` (п. 3) и `issues.md` (п. 5).
 
 #### Средне
-- [ ] После исправления проблем синхронизировать/расширить regression-тесты так, чтобы новые найденные кейсы оставались закрытыми навсегда: oversized `list_item`, forced-split `heading`, `replanTail()` по заголовку, degradation diagnostics, validation errors; см. `issues.md` и текущие красные тесты.
+- [x] После исправления проблем синхронизировать/расширить regression-тесты так, чтобы новые найденные кейсы оставались закрытыми навсегда: oversized `list_item`, forced-split `heading`, `replanTail()` по заголовку, degradation diagnostics, validation errors; см. `issues.md` и текущие красные тесты.
 
 #### Nice-to-have
 - [ ] Улучшить soft-splitting для oversized не-параграфных children внутри `list_item` (`quote`, nested `list`, `code_block`): сейчас они корректно эскалируют стратегию, но могут деградировать раньше, чем строго необходимо.
+- [ ] Уточнить детекцию unsupported pipe-table для diagnostics: текущая regex-эвристика по сырому markdown может давать false positive внутри fenced code block и других нетабличных контекстов; по возможности опираться на token/context-aware detection.
 
 ### Выполнено в предыдущей итерации
 
