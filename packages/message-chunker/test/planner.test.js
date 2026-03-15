@@ -153,6 +153,24 @@ describe('planner — split-blocks-soft', () => {
         }
     });
 
+    it('preserves markdown line breaks when paragraph is split', () => {
+        const md = 'alpha\nbeta  \ngamma ' + 'tail '.repeat(60);
+        const result = plan(md, {
+            preferredMode: 'plain-text',
+            strategy: 'split-blocks-soft',
+            transport: { safeTextBudget: 200 },
+        });
+
+        assert.equal(result.diagnostics.usedStrategy, 'split-blocks-soft');
+        assert.equal(result.diagnostics.usedMode, 'plain-text');
+        assert.ok(result.chunks.length >= 2, `expected split, got ${result.chunks.length} chunk(s)`);
+        assert.match(result.chunks[0].content, /alpha\nbeta\ngamma/);
+
+        for (const chunk of result.chunks) {
+            assert.ok(chunk.content.length <= 200, `chunk ${chunk.index} too long: ${chunk.content.length}`);
+        }
+    });
+
     it('code_block stays atomic in rich-html', () => {
         const code = '```\n' + 'x'.repeat(300) + '\n```';
         const md = 'Before\n\n' + code;

@@ -11,7 +11,7 @@
 
 ## Высокий приоритет
 
-### 1. Markdown line breaks (`soft_break` / `hard_break`)
+### 1. [x] Markdown line breaks (`soft_break` / `hard_break`)
 
 **Почему важно**
 - В RFC line breaks входят в поддерживаемый inline-subset.

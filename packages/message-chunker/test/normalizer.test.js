@@ -14,6 +14,10 @@ function collectText(node) {
     return '';
 }
 
+function childTypes(node) {
+    return (node.children || []).map(child => child.type);
+}
+
 describe('normalizer — paragraphs', () => {
     it('single paragraph', () => {
         const ir = normalize('Hello world');
@@ -37,6 +41,26 @@ describe('normalizer — paragraphs', () => {
     it('whitespace-only input returns empty root', () => {
         const ir = normalize('   \n  \n   ');
         assert.equal(ir.children.length, 0);
+    });
+
+    it('single newline inside paragraph becomes soft_break', () => {
+        const ir = normalize('alpha\nbeta');
+        const paragraph = ir.children[0];
+
+        assert.equal(paragraph.type, 'paragraph');
+        assert.deepEqual(childTypes(paragraph), ['text', 'soft_break', 'text']);
+        assert.equal(paragraph.children[0].value, 'alpha');
+        assert.equal(paragraph.children[2].value, 'beta');
+    });
+
+    it('markdown hard break becomes hard_break', () => {
+        const ir = normalize('alpha  \nbeta');
+        const paragraph = ir.children[0];
+
+        assert.equal(paragraph.type, 'paragraph');
+        assert.deepEqual(childTypes(paragraph), ['text', 'hard_break', 'text']);
+        assert.equal(paragraph.children[0].value, 'alpha');
+        assert.equal(paragraph.children[2].value, 'beta');
     });
 });
 

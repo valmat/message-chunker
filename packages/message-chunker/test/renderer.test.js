@@ -25,6 +25,16 @@ describe('renderer-html — paragraphs', () => {
         const { html } = renderBoth('First\n\nSecond');
         assert.equal(html, 'First\n\nSecond');
     });
+
+    it('soft break is rendered as newline', () => {
+        const { html } = renderBoth('alpha\nbeta');
+        assert.equal(html, 'alpha\nbeta');
+    });
+
+    it('hard break is rendered as newline', () => {
+        const { html } = renderBoth('alpha  \nbeta');
+        assert.equal(html, 'alpha\nbeta');
+    });
 });
 
 describe('renderer-html — headings', () => {
@@ -190,6 +200,16 @@ describe('renderer-plain — paragraphs', () => {
     it('multiple paragraphs separated by \\n\\n', () => {
         const { plain } = renderBoth('First\n\nSecond');
         assert.equal(plain, 'First\n\nSecond');
+    });
+
+    it('soft break is rendered as newline', () => {
+        const { plain } = renderBoth('alpha\nbeta');
+        assert.equal(plain, 'alpha\nbeta');
+    });
+
+    it('hard break is rendered as newline', () => {
+        const { plain } = renderBoth('alpha  \nbeta');
+        assert.equal(plain, 'alpha\nbeta');
     });
 });
 
