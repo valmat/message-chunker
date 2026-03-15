@@ -626,6 +626,9 @@ describe('replanTail — invalid-markup end-to-end', () => {
         assert.equal(original.chunks[0].mode, 'rich-html');
         assert.match(original.chunks[0].content, /<b>B00<\/b>/);
 
+        const deliveredTokens = Array.from(original.chunks[0].content.matchAll(/<b>(B\d{2})<\/b>/g), match => match[1]);
+        const failedTokens = Array.from(original.chunks[1].content.matchAll(/<b>(B\d{2})<\/b>/g), match => match[1]);
+
         const tail = replan(md, original, 1, {
             preferredMode: 'plain-text',
             nextStrategy: 'preserve',
@@ -633,6 +636,8 @@ describe('replanTail — invalid-markup end-to-end', () => {
             rejectReason: 'invalid-markup',
         });
 
+        assert.ok(deliveredTokens.length >= 1, 'expected at least one delivered rich token in the first chunk');
+        assert.ok(failedTokens.length >= 1, 'expected at least one undelivered rich token in the failed chunk');
         assert.ok(tail.chunks.length >= 1, 'expected non-empty replanned tail');
         assert.equal(tail.diagnostics.requestedMode, 'plain-text');
         assert.equal(tail.diagnostics.usedMode, 'plain-text');
@@ -643,8 +648,12 @@ describe('replanTail — invalid-markup end-to-end', () => {
         }
 
         const tailFull = tail.chunks.map(chunk => chunk.content).join('');
-        assert.ok(!tailFull.includes('B00 text here.'), 'tail should not duplicate the already-delivered semantic prefix');
-        assert.ok(!tailFull.includes('B01 text here.'), 'tail should not duplicate early delivered content after markup degradation');
-        assert.ok(tailFull.includes('B09 text here.'), 'expected undelivered content to remain after plain-text replanning');
+        for (const token of deliveredTokens) {
+            assert.ok(!tailFull.includes(`${token} text here.`), `tail should not duplicate delivered token ${token} after markup degradation`);
+        }
+        assert.ok(
+            failedTokens.some(token => tailFull.includes(`${token} text here.`)),
+            'expected plain-text tail to keep content from the failed rich-html chunk'
+        );
     });
 });
