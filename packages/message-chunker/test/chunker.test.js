@@ -132,3 +132,84 @@ describe('public API exports', () => {
         assert.ok(tail.diagnostics);
     });
 });
+
+describe('transport profile validation edge cases', () => {
+    const validTransport = {
+        maxTextLength: 4096,
+        safeTextBudget: 3600,
+        supportsPlainText: true,
+        supportsMultipartPlainText: true,
+        supportsRichHtml: true,
+        countMethod: 'string-length',
+    };
+
+    it('rejects incorrect field types with explicit messages', () => {
+        assert.throws(
+            () => validateTransportProfile({ ...validTransport, maxTextLength: '4096' }),
+            /maxTextLength must be a positive number/
+        );
+        assert.throws(
+            () => validateTransportProfile({ ...validTransport, safeTextBudget: '3600' }),
+            /safeTextBudget must be a positive number/
+        );
+        assert.throws(
+            () => validateTransportProfile({ ...validTransport, supportsRichHtml: 'yes' }),
+            /supportsRichHtml must be a boolean/
+        );
+        assert.throws(
+            () => validateTransportProfile({ ...validTransport, countMethod: 'utf8-bytes' }),
+            /countMethod must be 'string-length'/
+        );
+    });
+
+    it('rejects unsupported transport flag combinations required by RFC v1', () => {
+        assert.throws(
+            () => validateTransportProfile({ ...validTransport, supportsPlainText: false }),
+            /supportsPlainText must be true/
+        );
+        assert.throws(
+            () => validateTransportProfile({ ...validTransport, supportsMultipartPlainText: false }),
+            /supportsMultipartPlainText must be true/
+        );
+    });
+
+    it('planDelivery and replanTail report the same transport validation error', () => {
+        const invalidTransport = { ...validTransport, supportsRichHtml: 'yes' };
+        const markdown = 'Hello world';
+        const previousPlan = planDelivery({
+            markdown,
+            preferredMode: 'auto',
+            strategy: 'preserve',
+            transport: validTransport,
+        });
+
+        let planError;
+        let replanError;
+
+        assert.throws(() => planDelivery({
+            markdown,
+            preferredMode: 'auto',
+            strategy: 'preserve',
+            transport: invalidTransport,
+        }), error => {
+            planError = error;
+            return true;
+        });
+
+        assert.throws(() => replanTail({
+            markdown,
+            previousPlan,
+            failedChunkIndex: 0,
+            preferredMode: 'auto',
+            nextStrategy: 'preserve',
+            transport: invalidTransport,
+            rejectReason: 'too-long',
+        }), error => {
+            replanError = error;
+            return true;
+        });
+
+        assert.equal(planError.message, 'TransportProfile.supportsRichHtml must be a boolean');
+        assert.equal(replanError.message, planError.message);
+    });
+});

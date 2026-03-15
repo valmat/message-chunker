@@ -102,7 +102,7 @@
 
 ---
 
-### 6. Дополнительные transport/profile validation tests
+### 6. [x] Дополнительные transport/profile validation tests
 
 **Почему важно**
 - Проверки `TransportProfile` уже есть, но можно добить более явные edge cases на уровне API.
