@@ -66,7 +66,7 @@ _Источник истины до синхронизации кода: `docs/r
 - [x] Исправить `sourceRange` для forced-split `heading`, чтобы соседние фрагменты имели разные `sourceRange.start`, а `replanTail()` не переотправлял уже доставленный префикс; см. `rfc_violations.md` (п. 2) и `issues.md` (п. 3).
 
 #### Высоко
-- [ ] Явно валидировать входные `strategy` и `preferredMode` в `planDelivery()`, чтобы API не принимал мусорные значения молча и не падал общей internal error; см. `issues.md` (п. 4).
+- [x] Явно валидировать входные `strategy` и `preferredMode` в `planDelivery()`, чтобы API не принимал мусорные значения молча и не падал общей internal error; см. `issues.md` (п. 4).
 - [ ] Довести diagnostics до полного соответствия RFC для unsupported markdown: raw HTML / tables / другие lowered-to-text конструкции должны выставлять `hadDegradation = true`; см. `rfc_violations.md` (п. 3) и `issues.md` (п. 5).
 
 #### Средне

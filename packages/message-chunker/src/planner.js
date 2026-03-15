@@ -25,6 +25,18 @@ import {
 export function planDelivery(request) {
     validateTransportProfile(request.transport);
 
+    const validPreferredModes = ['auto', 'rich-html', 'plain-text'];
+    if (!validPreferredModes.includes(request.preferredMode)) {
+        throw new Error(
+            `Unknown preferredMode: ${request.preferredMode}. ` +
+            `Valid values: ${validPreferredModes.join(', ')}`
+        );
+    }
+
+    if (!STRATEGY_LADDER.includes(request.strategy)) {
+        throw new Error(`Unknown strategy: ${request.strategy}`);
+    }
+
     const ir = normalize(request.markdown);
     return planFromIr(ir, 0, request);
 }
