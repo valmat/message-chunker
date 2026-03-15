@@ -657,3 +657,47 @@ describe('replanTail — invalid-markup end-to-end', () => {
         );
     });
 });
+
+describe('replanTail — strict sourceRange invariants', () => {
+    it('same-strategy replan keeps exact sourceRange of the failed paragraph chunk', () => {
+        const md = 'intro ' + 'one two three four. '.repeat(30);
+        const original = plan(md, {
+            preferredMode: 'plain-text',
+            strategy: 'split-blocks-soft',
+            transport: { safeTextBudget: 200 },
+        });
+
+        assert.ok(original.chunks.length >= 3, `expected >= 3 chunks, got ${original.chunks.length}`);
+
+        const tail = replan(md, original, 1, {
+            preferredMode: 'plain-text',
+            nextStrategy: 'split-blocks-soft',
+            transport: { safeTextBudget: 200 },
+            rejectReason: 'too-long',
+        });
+
+        assert.equal(tail.chunks[0].content, original.chunks[1].content);
+        assert.deepEqual(tail.chunks[0].sourceRange, original.chunks[1].sourceRange);
+    });
+
+    it('same-strategy replan keeps exact sourceRange of the failed list continuation chunk', () => {
+        const md = '- intro ' + 'one two three four. '.repeat(12) + '\n\n  second ' + 'five six seven eight. '.repeat(12);
+        const original = plan(md, {
+            preferredMode: 'plain-text',
+            strategy: 'split-blocks-soft',
+            transport: { safeTextBudget: 200 },
+        });
+
+        assert.ok(original.chunks.length >= 4, `expected >= 4 chunks, got ${original.chunks.length}`);
+
+        const tail = replan(md, original, 1, {
+            preferredMode: 'plain-text',
+            nextStrategy: 'split-blocks-soft',
+            transport: { safeTextBudget: 200 },
+            rejectReason: 'too-long',
+        });
+
+        assert.equal(tail.chunks[0].content, original.chunks[1].content);
+        assert.deepEqual(tail.chunks[0].sourceRange, original.chunks[1].sourceRange);
+    });
+});

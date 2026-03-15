@@ -556,3 +556,29 @@ describe('golden — exact sourceRange addresses', () => {
         );
     });
 });
+
+describe('golden — UTF-16 sourceRange semantics', () => {
+    it('forced-split emoji text uses exact UTF-16 offsets across chunks', () => {
+        const md = '😀'.repeat(103) + 'AB';
+        const result = plan(md, {
+            preferredMode: 'plain-text',
+            strategy: 'forced-plain-text',
+            transport: { safeTextBudget: 200 },
+        });
+
+        assert.equal(result.chunks.length, 2);
+        assert.deepEqual(
+            result.chunks.map(chunk => chunk.sourceRange),
+            [
+                {
+                    start: { path: [0, 0], offsetUtf16: 0 },
+                    end: { path: [0, 0], offsetUtf16: 200 },
+                },
+                {
+                    start: { path: [0, 0], offsetUtf16: 200 },
+                    end: { path: [0, 0], offsetUtf16: 208 },
+                },
+            ]
+        );
+    });
+});
