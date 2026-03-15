@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { planDelivery } from '../src/planner.js';
+import { assertChunksWithinBudget, planDelivery } from '../src/planner.js';
 
 // Default transport profile for tests
 const transport = {
@@ -407,6 +407,27 @@ describe('planner — budget invariant', () => {
 });
 
 // =============== validation ===============
+
+describe('planner — final chunk validation helper', () => {
+    it('accepts chunks within safeTextBudget', () => {
+        assert.doesNotThrow(() => {
+            assertChunksWithinBudget([
+                { index: 0, content: 'short' },
+                { index: 1, content: 'still fine' },
+            ], 20);
+        });
+    });
+
+    it('throws when a final chunk exceeds safeTextBudget', () => {
+        assert.throws(
+            () => assertChunksWithinBudget([
+                { index: 0, content: 'ok' },
+                { index: 1, content: 'x'.repeat(21) },
+            ], 20),
+            /chunk 1 exceeds safeTextBudget \(21 > 20\)/
+        );
+    });
+});
 
 describe('planner — validation', () => {
     it('throws on unknown strategy', () => {

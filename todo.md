@@ -61,7 +61,7 @@ _Источник истины до синхронизации кода: `docs/r
 
 #### Критично
 - [x] Исправить возврат oversized-чанка для длинного continuation-блока внутри `list_item`: `planDelivery()` не должен возвращать чанки длиннее `safeTextBudget`; см. `rfc_violations.md` (п. 1) и `issues.md` (пп. 1–2).
-- [ ] Добавить финальную runtime-валидацию собранного плана в `planDelivery()/planFromIr()`: каждый итоговый чанк должен повторно проверяться по `content.length <= safeTextBudget`, чтобы локальная ошибка в splitter'е не пробивала публичный инвариант; см. `issues.md` (п. 1).
+- [x] Добавить финальную runtime-валидацию собранного плана в `planDelivery()/planFromIr()`: каждый итоговый чанк должен повторно проверяться по `content.length <= safeTextBudget`, чтобы локальная ошибка в splitter'е не пробивала публичный инвариант; см. `issues.md` (п. 1).
 - [ ] Исправить обработку длинного `heading`: заголовок должен корректно деградировать по RFC и не ломать `sourceRange`/`replanTail()`; см. `rfc_violations.md` (п. 2) и `issues.md` (п. 3).
 - [ ] Исправить `sourceRange` для forced-split `heading`, чтобы соседние фрагменты имели разные `sourceRange.start`, а `replanTail()` не переотправлял уже доставленный префикс; см. `rfc_violations.md` (п. 2) и `issues.md` (п. 3).
 
@@ -71,6 +71,9 @@ _Источник истины до синхронизации кода: `docs/r
 
 #### Средне
 - [ ] После исправления проблем синхронизировать/расширить regression-тесты так, чтобы новые найденные кейсы оставались закрытыми навсегда: oversized `list_item`, forced-split `heading`, `replanTail()` по заголовку, degradation diagnostics, validation errors; см. `issues.md` и текущие красные тесты.
+
+#### Nice-to-have
+- [ ] Улучшить soft-splitting для oversized не-параграфных children внутри `list_item` (`quote`, nested `list`, `code_block`): сейчас они корректно эскалируют стратегию, но могут деградировать раньше, чем строго необходимо.
 
 ### Выполнено в предыдущей итерации
 

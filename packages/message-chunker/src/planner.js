@@ -55,6 +55,18 @@ export function planFromIr(ir, blockOffset, request) {
         const result = tryStrategy(ir, strategy, mode, budget);
         if (result) {
             const chunks = finalizeChunks(result.chunkData, ir, blockOffset);
+
+            try {
+                assertChunksWithinBudget(chunks, budget);
+            } catch (error) {
+                const next = nextStrategy(strategy);
+                if (next) {
+                    strategy = next;
+                    continue;
+                }
+                throw error;
+            }
+
             return {
                 chunks,
                 diagnostics: buildDiagnostics(
@@ -1321,6 +1333,18 @@ function computeSourceRange(ir, blockStart, blockEnd) {
 }
 
 // --------------- finalize chunks ---------------
+
+
+export function assertChunksWithinBudget(chunks, budget) {
+    for (const chunk of chunks) {
+        if (chunk.content.length > budget) {
+            throw new Error(
+                `Internal error: chunk ${chunk.index} exceeds safeTextBudget ` +
+                `(${chunk.content.length} > ${budget})`
+            );
+        }
+    }
+}
 
 function finalizeChunks(chunkData, ir, blockOffset = 0) {
     const total = chunkData.length;
