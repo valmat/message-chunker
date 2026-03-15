@@ -70,13 +70,13 @@ After migration there should be one obvious explanation:
 Objective: make the package live at repository root.
 
 Tasks:
-1. Move `packages/message-chunker/src` -> `./src`
-2. Move `packages/message-chunker/test` -> `./test`
-3. Replace the current root `package.json` with the package `package.json`
-4. Replace the current root `README.md` with the package README
-5. Remove workspace / monorepo-specific config from root
-6. Remove `packages/` once everything is migrated
-7. Recreate `package-lock.json` for the single-package layout
+1. [x] Move `packages/message-chunker/src` -> `./src`
+2. [x] Move `packages/message-chunker/test` -> `./test`
+3. [x] Replace the current root `package.json` with the package `package.json`
+4. [x] Replace the current root `README.md` with the package README
+5. [x] Remove workspace / monorepo-specific config from root
+6. [x] Remove `packages/` once everything is migrated
+7. [x] Recreate `package-lock.json` for the single-package layout
 
 Done when:
 - running from repo root feels like running from the package root
