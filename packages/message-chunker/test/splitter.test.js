@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { splitByParagraphRules } from '../src/splitter.js';
+import { splitByParagraphRules, splitForcedPlainText } from '../src/splitter.js';
 
 describe('splitter — splitByParagraphRules', () => {
     it('prefers semicolon over later whitespace', () => {
@@ -36,5 +36,39 @@ describe('splitter — splitByParagraphRules', () => {
         const result = splitByParagraphRules(text, 5);
 
         assert.deepEqual(result, ['abcde', 'fghijk']);
+    });
+});
+
+describe('splitter — splitForcedPlainText', () => {
+    it('prefers double newline over later single newline and whitespace', () => {
+        const text = 'alpha beta\n\ngamma\ndelta epsilon';
+        const result = splitForcedPlainText(text, 18);
+
+        assert.deepEqual(result, ['alpha beta', 'gamma\ndelta epsilon']);
+    });
+
+    it('prefers single newline over later whitespace', () => {
+        const text = 'alpha\nbeta gamma delta';
+        const result = splitForcedPlainText(text, 12);
+
+        assert.deepEqual(result, ['alpha', 'beta gamma delta']);
+    });
+
+    it('prefers whitespace when no newline boundary exists', () => {
+        const text = 'alpha beta gamma';
+        const result = splitForcedPlainText(text, 11);
+
+        assert.deepEqual(result, ['alpha beta', 'gamma']);
+    });
+
+    it('falls back to Unicode-safe forced split when no softer boundary exists', () => {
+        const text = '😀😀😀';
+        const result = splitForcedPlainText(text, 1);
+
+        assert.deepEqual(result, ['😀', '😀😀']);
+    });
+
+    it('returns null when text already fits budget', () => {
+        assert.equal(splitForcedPlainText('short text', 50), null);
     });
 });

@@ -791,3 +791,78 @@ describe('replanTail — node-boundary sourceRange invariants', () => {
         });
     });
 });
+
+describe('replanTail — synthetic edge cases', () => {
+    it('returns an empty tail when previous sourceRange points beyond normalized blocks', () => {
+        const tail = replanTail({
+            markdown: 'Hello',
+            previousPlan: {
+                chunks: [
+                    {
+                        sourceRange: {
+                            start: { path: [5], offsetUtf16: 0 },
+                            end: { path: [5], offsetUtf16: 0 },
+                        },
+                    },
+                ],
+            },
+            failedChunkIndex: 0,
+            preferredMode: 'auto',
+            nextStrategy: 'preserve',
+            transport,
+            rejectReason: 'too-long',
+        });
+
+        assert.deepEqual(tail.chunks, []);
+        assert.equal(tail.diagnostics.chunkCount, 0);
+        assert.equal(tail.diagnostics.normalizedBlockCount, 0);
+        assert.equal(tail.diagnostics.usedStrategy, 'preserve');
+    });
+
+    it('does not emit an empty chunk when trim lands exactly at the block end', () => {
+        const tail = replanTail({
+            markdown: 'Hello',
+            previousPlan: {
+                chunks: [
+                    {
+                        sourceRange: {
+                            start: { path: [0, 0], offsetUtf16: 5 },
+                            end: { path: [0, 0], offsetUtf16: 5 },
+                        },
+                    },
+                ],
+            },
+            failedChunkIndex: 0,
+            preferredMode: 'plain-text',
+            nextStrategy: 'preserve',
+            transport,
+            rejectReason: 'too-long',
+        });
+
+        assert.deepEqual(tail.chunks, []);
+        assert.equal(tail.diagnostics.chunkCount, 0);
+        assert.equal(tail.diagnostics.plainTextLengthEstimate, 0);
+    });
+
+    it('gracefully handles stale child-path cursors instead of throwing', () => {
+        assert.doesNotThrow(() => replanTail({
+            markdown: 'Hello',
+            previousPlan: {
+                chunks: [
+                    {
+                        sourceRange: {
+                            start: { path: [0, 9], offsetUtf16: 0 },
+                            end: { path: [0, 9], offsetUtf16: 0 },
+                        },
+                    },
+                ],
+            },
+            failedChunkIndex: 0,
+            preferredMode: 'plain-text',
+            nextStrategy: 'preserve',
+            transport,
+            rejectReason: 'too-long',
+        }));
+    });
+});
+

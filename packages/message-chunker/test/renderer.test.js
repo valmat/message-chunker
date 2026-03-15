@@ -174,6 +174,39 @@ describe('renderer-html — thematic break', () => {
     });
 });
 
+
+
+describe('renderers — unknown-node fallbacks', () => {
+    it('rich-html renderer falls back to children/value for unknown nodes', () => {
+        const blocks = [
+            {
+                type: 'mystery_block',
+                children: [
+                    { type: 'text', value: 'alpha ' },
+                    { type: 'mystery_inline', value: '<beta>' },
+                    { type: 'strong', children: [{ type: 'text', value: 'gamma' }] },
+                ],
+            },
+        ];
+
+        assert.equal(renderHtml(blocks), 'alpha &lt;beta&gt;<b>gamma</b>');
+    });
+
+    it('plain-text renderer falls back to children/value for unknown nodes', () => {
+        const blocks = [
+            {
+                type: 'mystery_block',
+                children: [
+                    { type: 'text', value: 'alpha ' },
+                    { type: 'mystery_inline', value: '<beta>' },
+                    { type: 'strong', children: [{ type: 'text', value: 'gamma' }] },
+                ],
+            },
+        ];
+
+        assert.equal(renderPlain(blocks), 'alpha <beta>gamma');
+    });
+});
 describe('renderers — unsupported exotic nesting fallbacks', () => {
     it('keeps deterministic text order for quote/list/code with unsupported syntax inside', () => {
         const md = [

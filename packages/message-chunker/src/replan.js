@@ -80,7 +80,11 @@ export function replanTail(request) {
         const subPath = startCursor.path.slice(1);
         const trimmedBlock = trimBlockFromCursor(block, subPath, startCursor.offsetUtf16);
         const restBlocks = fullIr.children.slice(blockIdx + 1);
-        tailIr = { type: 'root', children: [trimmedBlock, ...restBlocks] };
+        const tailChildren = [];
+        if (!isEffectivelyEmptyBlock(trimmedBlock)) {
+            tailChildren.push(trimmedBlock);
+        }
+        tailIr = { type: 'root', children: [...tailChildren, ...restBlocks] };
     }
 
     if (tailIr.children.length === 0) {
@@ -171,6 +175,10 @@ function translateCursorFromTrimmedBlock(block, trimPath, trimOffset, blockIdx, 
 }
 
 function translatePathFromTrimmedNode(node, trimPath, trimOffset, localPath) {
+    if (!node) {
+        return [...localPath];
+    }
+
     if (localPath.length === 0) {
         // Cursor points at the current node itself. For leaf blocks such as code_block,
         // this intentionally stays as the block-level path [blockIdx] in full-IR coordinates.
@@ -184,6 +192,9 @@ function translatePathFromTrimmedNode(node, trimPath, trimOffset, localPath) {
     const trimmedChildIndex = trimPath[0];
     const localIndex = localPath[0];
     const targetChild = node.children[trimmedChildIndex];
+    if (!targetChild) {
+        return [...localPath];
+    }
     const trimmedTarget = trimBlockFromCursor(targetChild, trimPath.slice(1), trimOffset);
 
     if (localIndex === 0 && trimmedTarget) {
@@ -202,6 +213,18 @@ function translatePathFromTrimmedNode(node, trimPath, trimOffset, localPath) {
 
 // --------------- IR trimming ---------------
 
+
+function isEffectivelyEmptyBlock(block) {
+    if (!block) return true;
+    if (block.type === 'text' || block.type === 'inline_code' || block.type === 'code_block') {
+        return (block.value || '').length === 0;
+    }
+    if (block.children) {
+        return block.children.every(child => isEffectivelyEmptyBlock(child));
+    }
+    return false;
+}
+
 /**
  * Trim a block from the given cursor position, removing the already-delivered prefix.
  * Recursively descends the path, trimming children and leaf values.
@@ -212,6 +235,8 @@ function translatePathFromTrimmedNode(node, trimPath, trimOffset, localPath) {
  * @returns {Object} — trimmed copy of the block
  */
 function trimBlockFromCursor(block, path, offsetUtf16) {
+    if (!block) return null;
+
     // Path is empty — cursor points at this node directly
     if (path.length === 0) {
         // For code_block: trim value from offset
