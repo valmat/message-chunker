@@ -539,12 +539,16 @@ describe('replanTail — intra-block reject: code block', () => {
 });
 
 describe('replanTail — regression: long heading', () => {
-    it('split heading fragments must have distinct sourceRange.start cursors', () => {
-        const md = '# ' + 'word '.repeat(100);
+    function uniqueHeadingMarkdown() {
+        return '# ' + Array.from({ length: 120 }, (_, i) => `word${String(i).padStart(3, '0')}`).join(' ');
+    }
+
+    it('forced-split heading fragments must have distinct sourceRange.start cursors', () => {
+        const md = uniqueHeadingMarkdown();
         const budget = 200;
         const original = plan(md, {
-            preferredMode: 'rich-html',
-            strategy: 'preserve',
+            preferredMode: 'plain-text',
+            strategy: 'forced-plain-text',
             transport: { safeTextBudget: budget },
         });
 
@@ -560,12 +564,12 @@ describe('replanTail — regression: long heading', () => {
         }
     });
 
-    it('replanTail must not re-send delivered prefix for split heading', () => {
-        const md = '# ' + 'word '.repeat(100);
+    it('replanTail must not re-send delivered prefix for forced-split heading', () => {
+        const md = uniqueHeadingMarkdown();
         const budget = 200;
         const original = plan(md, {
-            preferredMode: 'rich-html',
-            strategy: 'preserve',
+            preferredMode: 'plain-text',
+            strategy: 'forced-plain-text',
             transport: { safeTextBudget: budget },
         });
 
@@ -584,6 +588,15 @@ describe('replanTail — regression: long heading', () => {
             !tailFull.includes(delivered),
             'tail should not contain the already-delivered heading prefix'
         );
+
+        const starts = tail.chunks.map(c => c.sourceRange.start);
+        for (let i = 1; i < starts.length; i++) {
+            assert.ok(
+                !pathAndOffsetEqual(starts[i - 1], starts[i]),
+                `tail heading chunks ${i - 1} and ${i} have identical start cursor: ` +
+                `${JSON.stringify(starts[i])}`
+            );
+        }
     });
 });
 

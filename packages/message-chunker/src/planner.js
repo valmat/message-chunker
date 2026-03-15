@@ -1151,6 +1151,9 @@ function blockRenderedOffsetToCursor(block, renderedOffset, blockIdx) {
     if (block.type === 'paragraph') {
         return paragraphRenderedOffsetToCursor(block, renderedOffset, blockIdx);
     }
+    if (block.type === 'heading') {
+        return headingRenderedOffsetToCursor(block, renderedOffset, blockIdx);
+    }
     if (block.type === 'code_block') {
         return codeBlockRenderedOffsetToCursor(block, renderedOffset, blockIdx);
     }
@@ -1163,6 +1166,14 @@ function blockRenderedOffsetToCursor(block, renderedOffset, blockIdx) {
     // For other block types (thematic_break, etc.), first leaf is accurate
     const cursor = findFirstLeafCursorInner(block, []);
     return { path: [blockIdx, ...cursor.path], offsetUtf16: cursor.offsetUtf16 };
+}
+
+function headingRenderedOffsetToCursor(heading, renderedOffset, blockIdx) {
+    return paragraphRenderedOffsetToCursor(
+        { type: 'paragraph', children: heading.children },
+        renderedOffset,
+        blockIdx
+    );
 }
 
 /**
