@@ -71,7 +71,7 @@
 
 ---
 
-### 4. End-to-end сценарий `invalid-markup` для `replanTail()`
+### 4. [x] End-to-end сценарий `invalid-markup` для `replanTail()`
 
 **Почему важно**
 - Это один из двух канонических `rejectReason` по RFC.
