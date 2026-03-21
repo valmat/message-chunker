@@ -1,6 +1,6 @@
 {
   "name": "message-chunker",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Safe preparation module for splitting long rich-text (Markdown) messages for delivery through transports with message length limits.",
   "type": "module",
   "main": "./src/index.js",
