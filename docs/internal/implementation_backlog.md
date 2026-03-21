@@ -106,3 +106,28 @@
   1. Test для `planDelivery()`, где forced split действительно случается и `diagnostics.hadForcedSplit === true`.
   2. Test для `planDelivery()`, где используются только мягкие границы и `diagnostics.hadForcedSplit === false`.
   3. Test для `replanTail()`, который подтверждает ту же семантику для replanned tail.
+
+- [ ] Усилить regression fixtures для splitting и `replanTail()` на realistic content
+  Суть:
+  Это не новая дыра runtime-spec и не новый алгоритмический bug сам по себе.
+  Это internal engineering/testing backlog: важные пользовательские сценарии должны быть закреплены tests так, чтобы улучшения split quality и replanning не ломались тихо.
+
+  Почему это не тащим дальше в RFC:
+  Текущий runtime-контракт `replanTail()` уже достаточно силён.
+  Здесь проблема в основном не в недостающей семантике API, а в том, что часть полезных пользовательских сценариев пока не закреплена достаточно жёсткими regression tests.
+
+  Что нужно покрыть:
+  1. `rich-html` paragraph split quality с проверкой exact chunk contents, а не только chunk count.
+  2. Case с escaped HTML-sensitive text (`&`, `<`, `>`), где rendered-length fitting влияет на split boundary.
+  3. `replanTail()` case, где `too-long` с изменённым budget и/или более агрессивной strategy реально меняет tail boundaries, а не только формально возвращает новый plan.
+  4. `replanTail()` case, где `invalid-markup` явно переключает undelivered tail в `plain-text`.
+  5. Reject внутри уже split block, чтобы было жёстко доказано отсутствие дублирования delivered prefix.
+
+  Что уже частично есть:
+  Есть хорошие tests на `replanTail()`, `invalid-markup`, `sourceRange` и некоторые rich-html cases, но покрытие не полностью выстроено как набор целевых regression fixtures под user-facing expectations.
+  [test/replan.test.js](test/replan.test.js#L613)
+  [test/complex.test.js](test/complex.test.js#L560)
+  [test/planner.test.js](test/planner.test.js#L145)
+
+  Цель:
+  Не расширить спецификацию, а повысить уверенность, что принятые RFC-решения и bugfixes останутся защищены в кодовой базе.
