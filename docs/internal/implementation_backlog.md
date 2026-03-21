@@ -107,7 +107,7 @@
   2. Test для `planDelivery()`, где используются только мягкие границы и `diagnostics.hadForcedSplit === false`.
   3. Test для `replanTail()`, который подтверждает ту же семантику для replanned tail.
 
-- [ ] Усилить regression fixtures для splitting и `replanTail()` на realistic content
+- [x] Усилить regression fixtures для splitting и `replanTail()` на realistic content
   Суть:
   Это не новая дыра runtime-spec и не новый алгоритмический bug сам по себе.
   Это internal engineering/testing backlog: важные пользовательские сценарии должны быть закреплены tests так, чтобы улучшения split quality и replanning не ломались тихо.

@@ -697,6 +697,120 @@ describe('replanTail — invalid-markup end-to-end', () => {
     });
 });
 
+describe('replanTail — realistic regression fixtures', () => {
+    it('too-long with lower budget and plain-text replanning changes tail boundaries on realistic rich-html content', () => {
+        const md = [
+            'Это первый длинный абзац с HTML-чувствительным текстом: alpha & beta < gamma > delta.',
+            'Он нужен, чтобы исходный rich-html план порезался на мягких границах и дал несколько кусков.',
+            'Затем мы хотим ужать budget и убедиться, что replanned tail действительно меняет свои границы,',
+            'а не просто формально пересобирает тот же самый хвост.',
+            'В конце добавим ещё одно предложение, чтобы хвост точно остался длинным.',
+        ].join(' ');
+
+        const original = plan(md, {
+            preferredMode: 'auto',
+            strategy: 'preserve',
+            transport: { safeTextBudget: 250 },
+        });
+        const tail = replan(md, original, 1, {
+            preferredMode: 'auto',
+            nextStrategy: 'plain-text',
+            transport: { safeTextBudget: 200 },
+            rejectReason: 'too-long',
+        });
+
+        assert.equal(original.diagnostics.usedMode, 'rich-html');
+        assert.equal(original.diagnostics.usedStrategy, 'split-blocks-soft');
+        assert.equal(original.chunks.length, 2);
+        assert.equal(
+            original.chunks[1].content,
+            [
+                'Затем мы хотим ужать budget и убедиться, что replanned tail действительно меняет свои границы,',
+                'а не просто формально пересобирает тот же самый хвост.',
+                'В конце добавим ещё одно предложение, чтобы хвост точно остался длинным.',
+            ].join(' ')
+        );
+
+        assert.equal(tail.diagnostics.usedMode, 'plain-text');
+        assert.equal(tail.diagnostics.usedStrategy, 'plain-text');
+        assert.deepEqual(
+            tail.chunks.map(chunk => chunk.content),
+            [
+                'Затем мы хотим ужать budget и убедиться, что replanned tail действительно меняет свои границы, а не просто формально пересобирает тот же самый хвост.',
+                'В конце добавим ещё одно предложение, чтобы хвост точно остался длинным.',
+            ]
+        );
+        assert.notEqual(
+            tail.chunks[0].content,
+            original.chunks[1].content,
+            'replanned tail should have different boundaries after lowering budget and switching strategy'
+        );
+    });
+
+    it('invalid-markup rebuilds the undelivered rich-html tail as exact plain-text content', () => {
+        const md = Array.from(
+            { length: 16 },
+            (_, i) => `**B${String(i).padStart(2, '0')}** token ${String(i).padStart(2, '0')}.`
+        ).join(' ');
+
+        const original = plan(md, {
+            preferredMode: 'auto',
+            strategy: 'preserve',
+            transport: { safeTextBudget: 200 },
+        });
+        const tail = replan(md, original, 1, {
+            preferredMode: 'plain-text',
+            nextStrategy: 'preserve',
+            transport: { safeTextBudget: 200 },
+            rejectReason: 'invalid-markup',
+        });
+
+        assert.equal(original.diagnostics.usedMode, 'rich-html');
+        assert.equal(original.chunks.length, 2);
+        assert.match(original.chunks[0].content, /<b>B00<\/b>/);
+        assert.match(original.chunks[1].content, /^token 09\. <b>B10<\/b>/);
+
+        assert.equal(tail.diagnostics.usedMode, 'plain-text');
+        assert.equal(tail.chunks.length, 1);
+        assert.equal(
+            tail.chunks[0].content,
+            'token 09. B10 token 10. B11 token 11. B12 token 12. B13 token 13. B14 token 14. B15 token 15.'
+        );
+        assert.ok(!tail.chunks[0].content.includes('<b>'));
+        assert.ok(!tail.chunks[0].content.includes('B08 token 08.'));
+    });
+
+    it('same-strategy intra-block replan preserves the exact remaining chunk sequence for unique numbered sentences', () => {
+        const md = Array.from(
+            { length: 30 },
+            (_, i) => `Sentence ${String(i).padStart(2, '0')} closes here.`
+        ).join(' ');
+
+        const original = plan(md, {
+            preferredMode: 'plain-text',
+            strategy: 'split-blocks-soft',
+            transport: { safeTextBudget: 200 },
+        });
+        const tail = replan(md, original, 1, {
+            preferredMode: 'plain-text',
+            nextStrategy: 'split-blocks-soft',
+            transport: { safeTextBudget: 200 },
+            rejectReason: 'too-long',
+        });
+
+        assert.equal(original.chunks.length, 4);
+        assert.deepEqual(
+            tail.chunks.map(chunk => chunk.content),
+            original.chunks.slice(1).map(chunk => chunk.content)
+        );
+
+        const tailFull = tail.chunks.map(chunk => chunk.content).join(' ');
+        assert.ok(!tailFull.includes('Sentence 00 closes here.'));
+        assert.ok(tailFull.includes('Sentence 08 closes here.'));
+        assert.ok(tailFull.includes('Sentence 29 closes here.'));
+    });
+});
+
 describe('replanTail — strict sourceRange invariants', () => {
     it('same-strategy replan keeps exact sourceRange of the failed paragraph chunk', () => {
         const md = 'intro ' + 'one two three four. '.repeat(30);
