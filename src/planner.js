@@ -425,14 +425,7 @@ function splitTextNode(textValue, budget, mode) {
         // Find the max original text prefix whose escaped form fits budget
         const maxLen = maxOriginalPrefixForHtml(textValue, budget);
         if (maxLen <= 0 || maxLen >= textValue.length) return null;
-
-        const candidate = textValue.slice(0, maxLen);
-        const split = splitByParagraphRules(candidate, candidate.length);
-        if (split) return [split[0], split[1] + textValue.slice(maxLen)];
-
-        // No paragraph-rule boundary found, use forced split
-        const forced = unicodeSafeSplit(candidate, candidate.length);
-        return [forced[0], forced[1] + textValue.slice(maxLen)];
+        return splitByParagraphRules(textValue, maxLen);
     }
 
     // plain-text: direct split

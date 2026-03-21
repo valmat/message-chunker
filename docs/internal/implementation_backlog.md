@@ -11,7 +11,7 @@
 
 ## Open Tasks
 
-- [ ] `rich-html` soft split режет абзац посередине слова, хотя внутри fitting window есть более мягкая граница
+- [x] `rich-html` soft split режет абзац посередине слова, хотя внутри fitting window есть более мягкая граница
   Суть:
   В `split-blocks-soft` для `rich-html` длинный paragraph может закончиться на середине слова, хотя RFC требует предпочитать sentence end / `;` / `,` / whitespace и использовать forced split только в самом конце.
 

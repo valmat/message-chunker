@@ -185,6 +185,98 @@ describe('planner — split-blocks-soft', () => {
             result.diagnostics.usedStrategy === 'forced-plain-text'
         );
     });
+
+    it('rich-html prefers a sentence boundary inside the fitting prefix', () => {
+        const md = [
+            'Это один очень длинный абзац для демонстрации split-blocks-soft.',
+            'Он специально состоит из многих предложений.',
+            'Библиотека сначала пытается сохранить всё целиком.',
+            'Потом пытается делить по блокам.',
+            'Но блок здесь один, поэтому ей приходится делить внутри абзаца.',
+            'Сначала она ищет конец предложения.',
+            'Потом точку с запятой; потом запятую, а затем пробел.',
+            'И только в самом крайнем случае делает принудительный Unicode-safe разрез.',
+        ].join(' ');
+
+        const result = plan(md, { transport: { safeTextBudget: 240 } });
+
+        assert.equal(result.diagnostics.usedStrategy, 'split-blocks-soft');
+        assert.equal(result.diagnostics.usedMode, 'rich-html');
+        assert.equal(result.chunks.length, 2);
+        assert.deepEqual(
+            result.chunks.map(chunk => chunk.content),
+            [
+                [
+                    'Это один очень длинный абзац для демонстрации split-blocks-soft.',
+                    'Он специально состоит из многих предложений.',
+                    'Библиотека сначала пытается сохранить всё целиком.',
+                    'Потом пытается делить по блокам.',
+                ].join(' '),
+                [
+                    'Но блок здесь один, поэтому ей приходится делить внутри абзаца.',
+                    'Сначала она ищет конец предложения.',
+                    'Потом точку с запятой; потом запятую, а затем пробел.',
+                    'И только в самом крайнем случае делает принудительный Unicode-safe разрез.',
+                ].join(' '),
+            ]
+        );
+    });
+
+    it('rich-html falls back to whitespace when no sentence boundary exists', () => {
+        const segment = 'alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron ';
+        const tail = 'pi rho sigma tau upsilon phi chi psi omega';
+        const md = (segment + tail + ' ').repeat(4).trim();
+
+        const result = plan(md, { transport: { safeTextBudget: 220 } });
+
+        assert.equal(result.diagnostics.usedStrategy, 'split-blocks-soft');
+        assert.equal(result.diagnostics.usedMode, 'rich-html');
+        assert.ok(result.chunks.length >= 2);
+        assert.equal(
+            result.chunks[0].content,
+            [
+                segment + tail,
+                segment + 'pi rho sigma',
+            ].join(' ')
+        );
+        assert.match(result.chunks[1].content, /^tau upsilon /);
+        assert.doesNotMatch(result.chunks[0].content, /sigm$/);
+        assert.doesNotMatch(result.chunks[1].content, /^a /);
+    });
+
+    it('rich-html keeps rendered-length fitting correct for escaped text while still choosing a soft boundary', () => {
+        const segment = 'alpha & beta < gamma > delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron ';
+        const tail = 'pi & rho < sigma > tau upsilon';
+        const md = (segment + tail + ' ').repeat(4).trim();
+
+        const result = plan(md, { transport: { safeTextBudget: 220 } });
+
+        assert.equal(result.diagnostics.usedStrategy, 'split-blocks-soft');
+        assert.equal(result.diagnostics.usedMode, 'rich-html');
+        assert.ok(result.chunks.length >= 2);
+        assert.equal(
+            result.chunks[0].content,
+            [
+                'alpha &amp; beta &lt; gamma &gt; delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron',
+                'pi &amp; rho &lt; sigma &gt; tau upsilon alpha &amp; beta &lt; gamma &gt; delta epsilon zeta eta theta iota kappa lambda',
+            ].join(' ')
+        );
+        assert.match(result.chunks[1].content, /^mu nu xi omicron /);
+        assert.ok(result.chunks[0].content.endsWith('lambda'));
+        assert.ok(!result.chunks[0].content.endsWith('&'));
+    });
+
+    it('rich-html uses forced split only when no softer boundary exists', () => {
+        const md = 'абвгдежзийклмнопрстуфхцчшщъыьэюя'.repeat(8);
+
+        const result = plan(md, { transport: { safeTextBudget: 220 } });
+
+        assert.equal(result.diagnostics.usedStrategy, 'split-blocks-soft');
+        assert.equal(result.diagnostics.usedMode, 'rich-html');
+        assert.equal(result.chunks.length, 2);
+        assert.equal(result.chunks[0].content.length, 220);
+        assert.equal(result.chunks[1].content, 'ьэюяабвгдежзийклмнопрстуфхцчшщъыьэюя');
+    });
 });
 
 // =============== plain-text strategy ===============

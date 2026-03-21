@@ -465,10 +465,21 @@ describe('replanTail — intra-block reject: list item', () => {
         });
 
         assert.ok(tail.chunks.length >= 1);
-
-        const tailFull = tail.chunks.map(c => c.content).join('');
-        assert.ok(!tailFull.includes(delivered),
-            'tail should not contain the already-delivered list item prefix');
+        assert.ok(
+            pathAndOffsetEqual(
+                tail.chunks[0].sourceRange.start,
+                original.chunks[1].sourceRange.start
+            ),
+            'tail should start exactly at the failed list-item fragment'
+        );
+        assert.ok(
+            !pathAndOffsetEqual(
+                tail.chunks[0].sourceRange.start,
+                original.chunks[0].sourceRange.start
+            ),
+            'tail must not restart from the already-delivered list-item prefix'
+        );
+        assert.equal(delivered, original.chunks[0].content);
 
         for (const chunk of tail.chunks) {
             assert.ok(chunk.content.length <= budget,
@@ -495,10 +506,21 @@ describe('replanTail — intra-block reject: quote', () => {
         });
 
         assert.ok(tail.chunks.length >= 1);
-
-        const tailFull = tail.chunks.map(c => c.content).join('');
-        assert.ok(!tailFull.includes(delivered),
-            'tail should not contain the already-delivered quote prefix');
+        assert.ok(
+            pathAndOffsetEqual(
+                tail.chunks[0].sourceRange.start,
+                original.chunks[1].sourceRange.start
+            ),
+            'tail should start exactly at the failed quote fragment'
+        );
+        assert.ok(
+            !pathAndOffsetEqual(
+                tail.chunks[0].sourceRange.start,
+                original.chunks[0].sourceRange.start
+            ),
+            'tail must not restart from the already-delivered quote prefix'
+        );
+        assert.equal(delivered, original.chunks[0].content);
 
         for (const chunk of tail.chunks) {
             assert.ok(chunk.content.length <= budget,
@@ -865,4 +887,3 @@ describe('replanTail — synthetic edge cases', () => {
         }));
     });
 });
-
