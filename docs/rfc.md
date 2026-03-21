@@ -634,6 +634,8 @@ Normative clarification for v1:
 - the maximal allowed prefix is determined first;
 - after that the split point is chosen only inside this prefix;
 - a forced Unicode-safe split is allowed only if, inside this maximal allowed prefix, there is no softer allowed boundary for the current split rule.
+- choosing a softer or forced boundary inside the current strategy is not the same as escalating the strategy;
+- strategy escalation is required only when the current strategy cannot produce a valid plan for the content under the current mode and budget.
 
 When checking the budget the normative length is the length of the final content after render and escape:
 
@@ -678,6 +680,8 @@ Normative clarification for v1:
 - then the planner applies the boundary priority list only inside that prefix;
 - if at least one of sentence end / `;` / `,` / whitespace exists inside that prefix, the planner must choose one of those boundaries and must not fall through to forced split;
 - forced Unicode-safe split is allowed only when no softer paragraph boundary exists inside that prefix.
+- in rich-html this guarantee applies only within the prefix that actually fits after the final rich render and escape;
+- rich-html escaping overhead and other mode-specific rendering costs may move that fitting prefix left compared with plain-text; this is an accepted limitation of v1 and does not by itself require strategy escalation.
 
 ### 14.2. List / List item
 
@@ -1059,6 +1063,11 @@ For v1 split diagnostics also stay intentionally minimalistic:
 - `hadForcedSplit = true` means that at least one actual chunk boundary in the final plan was produced by forced Unicode-safe split;
 - `hadForcedSplit = false` means that all actual chunk boundaries in the final plan were produced by softer split rules;
 - the implementation is not required in v1 to expose per-chunk split reasons, per-boundary event logs, or a separate `hadMidWordSplit` flag.
+
+For avoidance of doubt:
+
+- v1 does not require a configurable split-quality or readability-policy API;
+- v1 does not require a separate diagnostics signal for readability compromise beyond the minimal fields defined above.
 
 Do not include into splitBlockTypes the constructs that were just degraded without an actual split. For example, unsupported markdown and raw HTML must not get there only because they were lowered or escaped.
 
