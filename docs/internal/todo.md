@@ -104,12 +104,3 @@ _Источник истины до синхронизации кода: `docs/r
 
 ### Отложенный техдолг релиза
 - [x] Семантика diagnostics для unsupported markdown признана достаточной для v1; дальнейшая полировка перенесена из backlog реализации в spec-debt/observability follow-up и зафиксирована в `docs/known-limitations.md`.
-
-### Definition of done для следующей итерации
-- [x] Ни один путь планирования не возвращает чанк длиннее `safeTextBudget`.
-- [x] `heading` не вызывает дублирование уже доставленного текста при `replanTail()`.
-- [x] `sourceRange` корректен для forced-split фрагментов, в том числе для длинных заголовков.
-- [x] `planDelivery()` явно валидирует `strategy` и `preferredMode`.
-- [x] `hadDegradation` отражает понижение unsupported markdown до текстового представления.
-- [x] Все добавленные regression-тесты становятся зелёными и остаются в suite.
-- [x] После закрытия текущих функциональных проблем добрать недостающее тестовое покрытие по списку из `missing-tests.md`.
