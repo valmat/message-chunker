@@ -11,24 +11,47 @@
  * @returns {[string, string] | null}
  */
 export function splitForcedPlainText(text, budget) {
+    const result = splitForcedPlainTextDetailed(text, budget);
+    return result ? result.parts : null;
+}
+
+/**
+ * Detailed forced-plain-text split result with forced-split metadata.
+ * @param {string} text
+ * @param {number} budget
+ * @returns {{ parts: [string, string], hadForcedSplit: boolean } | null}
+ */
+export function splitForcedPlainTextDetailed(text, budget) {
     if (text.length <= budget) return null;
 
     const chunk = text.slice(0, budget);
 
     // 1. \n\n — double newline (block boundary)
     const p1 = chunk.lastIndexOf('\n\n');
-    if (p1 > 0) return [text.slice(0, p1), text.slice(p1 + 2)];
+    if (p1 > 0) return {
+        parts: [text.slice(0, p1), text.slice(p1 + 2)],
+        hadForcedSplit: false,
+    };
 
     // 2. \n — single newline
     const p2 = chunk.lastIndexOf('\n');
-    if (p2 > 0) return [text.slice(0, p2), text.slice(p2 + 1)];
+    if (p2 > 0) return {
+        parts: [text.slice(0, p2), text.slice(p2 + 1)],
+        hadForcedSplit: false,
+    };
 
     // 3. whitespace (space / tab)
     const p3 = findLastWhitespace(chunk);
-    if (p3 > 0) return [text.slice(0, p3), text.slice(p3 + 1)];
+    if (p3 > 0) return {
+        parts: [text.slice(0, p3), text.slice(p3 + 1)],
+        hadForcedSplit: false,
+    };
 
     // 4. forced Unicode-safe split
-    return unicodeSafeSplit(text, budget);
+    return {
+        parts: unicodeSafeSplit(text, budget),
+        hadForcedSplit: true,
+    };
 }
 
 /**
@@ -40,28 +63,54 @@ export function splitForcedPlainText(text, budget) {
  * @returns {[string, string] | null}
  */
 export function splitByParagraphRules(text, budget) {
+    const result = splitByParagraphRulesDetailed(text, budget);
+    return result ? result.parts : null;
+}
+
+/**
+ * Detailed paragraph split result with forced-split metadata.
+ * @param {string} text
+ * @param {number} budget
+ * @returns {{ parts: [string, string], hadForcedSplit: boolean } | null}
+ */
+export function splitByParagraphRulesDetailed(text, budget) {
     if (text.length <= budget) return null;
 
     const chunk = text.slice(0, budget);
 
     // 1. End of sentence: . ! ? followed by space/newline or at end of chunk
     const p1 = findLastSentenceEnd(chunk);
-    if (p1 > 0) return [text.slice(0, p1), text.slice(p1).replace(/^\s+/, '')];
+    if (p1 > 0) return {
+        parts: [text.slice(0, p1), text.slice(p1).replace(/^\s+/, '')],
+        hadForcedSplit: false,
+    };
 
     // 2. Semicolon
     const p2 = chunk.lastIndexOf(';');
-    if (p2 > 0) return [text.slice(0, p2 + 1), text.slice(p2 + 1).replace(/^\s+/, '')];
+    if (p2 > 0) return {
+        parts: [text.slice(0, p2 + 1), text.slice(p2 + 1).replace(/^\s+/, '')],
+        hadForcedSplit: false,
+    };
 
     // 3. Comma
     const p3 = chunk.lastIndexOf(',');
-    if (p3 > 0) return [text.slice(0, p3 + 1), text.slice(p3 + 1).replace(/^\s+/, '')];
+    if (p3 > 0) return {
+        parts: [text.slice(0, p3 + 1), text.slice(p3 + 1).replace(/^\s+/, '')],
+        hadForcedSplit: false,
+    };
 
     // 4. Whitespace
     const p4 = findLastWhitespace(chunk);
-    if (p4 > 0) return [text.slice(0, p4), text.slice(p4 + 1)];
+    if (p4 > 0) return {
+        parts: [text.slice(0, p4), text.slice(p4 + 1)],
+        hadForcedSplit: false,
+    };
 
     // 5. Forced Unicode-safe split
-    return unicodeSafeSplit(text, budget);
+    return {
+        parts: unicodeSafeSplit(text, budget),
+        hadForcedSplit: true,
+    };
 }
 
 /**

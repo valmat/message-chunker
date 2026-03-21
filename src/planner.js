@@ -11,8 +11,8 @@ import {
     STRATEGY_LADDER,
 } from './types.js';
 import {
-    splitForcedPlainText,
-    splitByParagraphRules,
+    splitForcedPlainTextDetailed,
+    splitByParagraphRulesDetailed,
     unicodeSafeSplit,
     maxOriginalPrefixForHtml,
 } from './splitter.js';
@@ -84,6 +84,7 @@ export function planFromIr(ir, blockOffset, request) {
                 diagnostics: buildDiagnostics(
                     request, ir, chunks, strategy, mode,
                     result.splitBlockTypes || [],
+                    result.hadForcedSplit === true,
                 ),
             };
         }
@@ -154,6 +155,7 @@ function tryPreserve(ir, mode, budget) {
                 blockEnd: ir.children.length - 1,
             }],
             splitBlockTypes: [],
+            hadForcedSplit: false,
         };
     }
     return null;
@@ -170,7 +172,7 @@ function trySplitBlocks(ir, mode, budget) {
     }
 
     const chunkData = greedyPack(rendered, ir.children, mode, budget);
-    return { chunkData, splitBlockTypes: [] };
+    return { chunkData, splitBlockTypes: [], hadForcedSplit: false };
 }
 
 // --------------- split-blocks-soft / plain-text ---------------
@@ -182,6 +184,7 @@ function trySplitBlocksSoft(ir, mode, budget) {
     let currentBlockEnd = -1;
     let currentSourceStart = null; // precise start cursor for split fragment tail
     const splitBlockTypes = new Set();
+    const splitContext = { hadForcedSplit: false };
 
     function flushCurrent() {
         if (currentContent) {
@@ -226,7 +229,7 @@ function trySplitBlocksSoft(ir, mode, budget) {
         if (!canSplitBlock(block, mode)) return null;
 
         splitBlockTypes.add(block.type);
-        const fragments = splitBlockIntoFragments(block, budget, mode);
+        const fragments = splitBlockIntoFragments(block, budget, mode, splitContext);
         if (!fragments) return null;
 
         // All fragments except the last become their own chunks
@@ -250,7 +253,11 @@ function trySplitBlocksSoft(ir, mode, budget) {
     }
 
     flushCurrent();
-    return { chunkData, splitBlockTypes: [...splitBlockTypes] };
+    return {
+        chunkData,
+        splitBlockTypes: [...splitBlockTypes],
+        hadForcedSplit: splitContext.hadForcedSplit,
+    };
 }
 
 function canSplitBlock(block, mode) {
@@ -269,33 +276,33 @@ function canSplitBlock(block, mode) {
  * Returns array of { content, cursorStart, cursorEnd } where cursor paths
  * are relative to the block (not including the block's own index).
  */
-function splitBlockIntoFragments(block, budget, mode) {
+function splitBlockIntoFragments(block, budget, mode, splitContext) {
     switch (block.type) {
         case 'paragraph':
-            return splitParagraphIntoFragments(block, budget, mode);
+            return splitParagraphIntoFragments(block, budget, mode, splitContext);
         case 'heading':
-            return splitHeadingIntoFragments(block, budget, mode);
+            return splitHeadingIntoFragments(block, budget, mode, splitContext);
         case 'quote':
-            return splitQuoteIntoFragments(block, budget, mode);
+            return splitQuoteIntoFragments(block, budget, mode, splitContext);
         case 'list':
-            return splitListIntoFragments(block, budget, mode);
+            return splitListIntoFragments(block, budget, mode, splitContext);
         case 'list_item':
-            return splitListItemIntoFragments(block, budget, mode);
+            return splitListItemIntoFragments(block, budget, mode, splitContext);
         case 'code_block':
-            return splitCodeBlockIntoFragments(block, budget);
+            return splitCodeBlockIntoFragments(block, budget, splitContext);
         default:
             return null;
     }
 }
 
-function splitHeadingIntoFragments(heading, budget, mode) {
+function splitHeadingIntoFragments(heading, budget, mode, splitContext) {
     if (mode !== 'plain-text') return null;
-    return splitParagraphIntoFragments({ type: 'paragraph', children: heading.children }, budget, mode);
+    return splitParagraphIntoFragments({ type: 'paragraph', children: heading.children }, budget, mode, splitContext);
 }
 
 // --------------- paragraph splitting ---------------
 
-function splitParagraphIntoFragments(paragraph, budget, mode) {
+function splitParagraphIntoFragments(paragraph, budget, mode, splitContext) {
     const children = paragraph.children;
     const fragments = [];
     let remaining = children;
@@ -314,7 +321,7 @@ function splitParagraphIntoFragments(paragraph, budget, mode) {
         }
 
         const prevLen = inlineTextLength(remaining);
-        const split = splitInlineOnce(remaining, budget, mode);
+        const split = splitInlineOnce(remaining, budget, mode, splitContext);
         if (!split) return null;
 
         const afterLen = inlineTextLength(split.restChildren);
@@ -350,7 +357,7 @@ function buildRestChildren(remainder, children, fromIndex) {
 /**
  * Split inline children array: return the longest prefix that fits budget.
  */
-function splitInlineOnce(children, budget, mode) {
+function splitInlineOnce(children, budget, mode, splitContext) {
     let accumulated = '';
 
     for (let i = 0; i < children.length; i++) {
@@ -362,7 +369,7 @@ function splitInlineOnce(children, budget, mode) {
                 // Try to take a partial piece from a text node to fill remaining budget
                 if (children[i].type === 'text') {
                     const remainingBudget = budget - accumulated.length;
-                    const textSplit = splitTextNode(children[i].value, remainingBudget, mode);
+                    const textSplit = splitTextNode(children[i].value, remainingBudget, mode, splitContext);
                     if (textSplit && textSplit[0].length > 0) {
                         const partialRendered = renderInline(
                             [{ type: 'text', value: textSplit[0] }], mode
@@ -384,7 +391,7 @@ function splitInlineOnce(children, budget, mode) {
 
             // This single node doesn't fit — try to split it
             if (children[i].type === 'text') {
-                const textSplit = splitTextNode(children[i].value, budget, mode);
+                const textSplit = splitTextNode(children[i].value, budget, mode, splitContext);
                 if (textSplit) {
                     return {
                         firstContent: renderInline(
@@ -400,11 +407,12 @@ function splitInlineOnce(children, budget, mode) {
 
             // In plain-text, unwrap and split as text
             const plainValue = renderInline([children[i]], 'plain-text');
-            const textSplit = splitByParagraphRules(plainValue, budget);
+            const textSplit = splitByParagraphRulesDetailed(plainValue, budget);
             if (textSplit) {
+                splitContext.hadForcedSplit ||= textSplit.hadForcedSplit;
                 return {
-                    firstContent: textSplit[0],
-                    restChildren: buildRestChildren(textSplit[1], children, i + 1),
+                    firstContent: textSplit.parts[0],
+                    restChildren: buildRestChildren(textSplit.parts[1], children, i + 1),
                 };
             }
 
@@ -420,21 +428,27 @@ function splitInlineOnce(children, budget, mode) {
 /**
  * Split a text node value to fit within budget, accounting for HTML escaping.
  */
-function splitTextNode(textValue, budget, mode) {
+function splitTextNode(textValue, budget, mode, splitContext) {
     if (mode === 'rich-html') {
         // Find the max original text prefix whose escaped form fits budget
         const maxLen = maxOriginalPrefixForHtml(textValue, budget);
         if (maxLen <= 0 || maxLen >= textValue.length) return null;
-        return splitByParagraphRules(textValue, maxLen);
+        const split = splitByParagraphRulesDetailed(textValue, maxLen);
+        if (!split) return null;
+        splitContext.hadForcedSplit ||= split.hadForcedSplit;
+        return split.parts;
     }
 
     // plain-text: direct split
-    return splitByParagraphRules(textValue, budget);
+    const split = splitByParagraphRulesDetailed(textValue, budget);
+    if (!split) return null;
+    splitContext.hadForcedSplit ||= split.hadForcedSplit;
+    return split.parts;
 }
 
 // --------------- quote splitting ---------------
 
-function splitQuoteIntoFragments(quote, budget, mode) {
+function splitQuoteIntoFragments(quote, budget, mode, splitContext) {
     const innerBlocks = quote.children;
     const fragments = [];
     let currentBlocks = [];
@@ -463,7 +477,7 @@ function splitQuoteIntoFragments(quote, budget, mode) {
                 const singleRendered = renderBlocks([singleQuote], mode);
                 if (singleRendered.length > budget) {
                     if (innerBlocks[i].type === 'paragraph') {
-                        const subFrags = splitParagraphForQuoteFragments(innerBlocks[i], budget, mode, i);
+                        const subFrags = splitParagraphForQuoteFragments(innerBlocks[i], budget, mode, i, splitContext);
                         if (!subFrags) return null;
                         for (const sf of subFrags) fragments.push(sf);
                         currentBlocks = [];
@@ -475,7 +489,7 @@ function splitQuoteIntoFragments(quote, budget, mode) {
             } else {
                 // Single inner block too large
                 if (innerBlocks[i].type === 'paragraph') {
-                    const subFrags = splitParagraphForQuoteFragments(innerBlocks[i], budget, mode, i);
+                    const subFrags = splitParagraphForQuoteFragments(innerBlocks[i], budget, mode, i, splitContext);
                     if (!subFrags) return null;
                     for (const sf of subFrags) fragments.push(sf);
                     currentBlocks = [];
@@ -499,12 +513,12 @@ function splitQuoteIntoFragments(quote, budget, mode) {
     return fragments.length > 0 ? fragments : null;
 }
 
-function splitParagraphForQuoteFragments(paragraph, budget, mode, innerBlockIdx) {
+function splitParagraphForQuoteFragments(paragraph, budget, mode, innerBlockIdx, splitContext) {
     const prefix = mode === 'rich-html' ? '&gt; ' : '> ';
     const innerBudget = budget - prefix.length;
     if (innerBudget <= 0) return null;
 
-    const paraFragments = splitParagraphIntoFragments(paragraph, innerBudget, mode);
+    const paraFragments = splitParagraphIntoFragments(paragraph, innerBudget, mode, splitContext);
     if (!paraFragments) return null;
 
     return paraFragments.map(frag => ({
@@ -516,7 +530,7 @@ function splitParagraphForQuoteFragments(paragraph, budget, mode, innerBlockIdx)
 
 // --------------- list splitting ---------------
 
-function splitListIntoFragments(list, budget, mode) {
+function splitListIntoFragments(list, budget, mode, splitContext) {
     const fragments = [];
     let currentItems = [];
     let currentStartItemIdx = 0;
@@ -542,7 +556,7 @@ function splitListIntoFragments(list, budget, mode) {
                 // Check single item
                 const singleList = { ...list, children: [item] };
                 if (renderBlocks([singleList], mode).length > budget) {
-                    const itemFrags = splitListItemForListFragments(item, budget, mode, i);
+                    const itemFrags = splitListItemForListFragments(item, budget, mode, i, splitContext);
                     if (!itemFrags) return null;
                     for (const ifr of itemFrags) fragments.push(ifr);
                     currentItems = [];
@@ -550,7 +564,7 @@ function splitListIntoFragments(list, budget, mode) {
                 }
             } else {
                 // Single item too large
-                const itemFrags = splitListItemForListFragments(item, budget, mode, i);
+                const itemFrags = splitListItemForListFragments(item, budget, mode, i, splitContext);
                 if (!itemFrags) return null;
                 for (const ifr of itemFrags) fragments.push(ifr);
                 currentItems = [];
@@ -571,8 +585,8 @@ function splitListIntoFragments(list, budget, mode) {
     return fragments.length > 0 ? fragments : null;
 }
 
-function splitListItemForListFragments(item, budget, mode, itemIdx) {
-    const itemFrags = splitListItemIntoFragments(item, budget, mode);
+function splitListItemForListFragments(item, budget, mode, itemIdx, splitContext) {
+    const itemFrags = splitListItemIntoFragments(item, budget, mode, splitContext);
     if (!itemFrags) return null;
     // Prepend itemIdx to each fragment's cursor path
     return itemFrags.map(frag => ({
@@ -588,7 +602,7 @@ function renderStandaloneListItemBlockContent(block, marker, indent, mode) {
     return marker + indented.trimStart();
 }
 
-function splitStandaloneListItemBlockIntoFragments(item, blockIdx, budget, mode, marker, indent) {
+function splitStandaloneListItemBlockIntoFragments(item, blockIdx, budget, mode, marker, indent, splitContext) {
     const block = item.children[blockIdx];
     const content = renderStandaloneListItemBlockContent(block, marker, indent, mode);
 
@@ -604,7 +618,7 @@ function splitStandaloneListItemBlockIntoFragments(item, blockIdx, budget, mode,
     if (innerBudget <= 0) return null;
 
     if (block.type === 'paragraph') {
-        const paraFrags = splitParagraphIntoFragments(block, innerBudget, mode);
+        const paraFrags = splitParagraphIntoFragments(block, innerBudget, mode, splitContext);
         if (!paraFrags) return null;
 
         return paraFrags.map(frag => ({
@@ -617,14 +631,14 @@ function splitStandaloneListItemBlockIntoFragments(item, blockIdx, budget, mode,
     return null;
 }
 
-function splitListItemIntoFragments(item, budget, mode) {
+function splitListItemIntoFragments(item, budget, mode, splitContext) {
     const marker = (item.marker || '-') + ' ';
     const indent = '  ';
 
     if (item.children.length === 0) return null;
 
     const fragments = [];
-    const firstBlockFragments = splitStandaloneListItemBlockIntoFragments(item, 0, budget, mode, marker, indent);
+    const firstBlockFragments = splitStandaloneListItemBlockIntoFragments(item, 0, budget, mode, marker, indent, splitContext);
     if (!firstBlockFragments) return null;
 
     let current = '';
@@ -641,7 +655,7 @@ function splitListItemIntoFragments(item, budget, mode) {
     for (let b = 1; b < item.children.length; b++) {
         const cont = renderBlocks([item.children[b]], mode);
         const indented = cont.split('\n').map(l => indent + l).join('\n');
-        const standaloneFragments = splitStandaloneListItemBlockIntoFragments(item, b, budget, mode, marker, indent);
+        const standaloneFragments = splitStandaloneListItemBlockIntoFragments(item, b, budget, mode, marker, indent, splitContext);
         if (!standaloneFragments) return null;
 
         if (!current) {
@@ -690,7 +704,7 @@ function splitListItemIntoFragments(item, budget, mode) {
 
 // --------------- code block splitting (plain-text only) ---------------
 
-function splitCodeBlockIntoFragments(block, budget) {
+function splitCodeBlockIntoFragments(block, budget, splitContext) {
     const lang = block.lang || '';
     const fenceOpen = '```' + lang + '\n';
     const fenceClose = '\n```';
@@ -710,6 +724,7 @@ function splitCodeBlockIntoFragments(block, budget) {
         if (lastNl > 0) {
             splitPos = lastNl;
         } else {
+            splitContext.hadForcedSplit = true;
             splitPos = unicodeSafeSplit(remaining, contentBudget)[0].length;
         }
 
@@ -744,6 +759,7 @@ function doForcedPlainText(ir, budget) {
     let currentBlockEnd = -1;
     let currentSourceStart = null;
     const splitBlockTypes = new Set();
+    let hadForcedSplit = false;
 
     function flushCurrent() {
         if (currentContent) {
@@ -788,8 +804,10 @@ function doForcedPlainText(ir, budget) {
 
             // Split code block with balanced fences
             splitBlockTypes.add('code_block');
-            const codeFrags = splitCodeBlockIntoFragments(block, budget);
+            const codeSplitContext = { hadForcedSplit: false };
+            const codeFrags = splitCodeBlockIntoFragments(block, budget, codeSplitContext);
             if (codeFrags) {
+                hadForcedSplit ||= codeSplitContext.hadForcedSplit;
                 for (let p = 0; p < codeFrags.length - 1; p++) {
                     chunkData.push({
                         content: codeFrags[p].content,
@@ -812,18 +830,19 @@ function doForcedPlainText(ir, budget) {
                 let rem = blockContent;
                 let renderedOffset = 0;
                 while (rem.length > budget) {
-                    const split = splitForcedPlainText(rem, budget);
+                    const split = splitForcedPlainTextDetailed(rem, budget);
                     if (!split) break;
+                    hadForcedSplit ||= split.hadForcedSplit;
                     chunkData.push({
-                        content: split[0],
+                        content: split.parts[0],
                         mode: 'plain-text',
                         blockStart: i,
                         blockEnd: i,
                         sourceStart: codeBlockRenderedOffsetToCursor(block, renderedOffset, i),
-                        sourceEnd: codeBlockRenderedOffsetToCursor(block, renderedOffset + split[0].length, i),
+                        sourceEnd: codeBlockRenderedOffsetToCursor(block, renderedOffset + split.parts[0].length, i),
                     });
-                    renderedOffset += split[0].length;
-                    rem = split[1];
+                    renderedOffset += split.parts[0].length;
+                    rem = split.parts[1];
                 }
                 currentContent = rem;
                 currentSourceStart = codeBlockRenderedOffsetToCursor(block, renderedOffset, i);
@@ -860,29 +879,30 @@ function doForcedPlainText(ir, budget) {
         let renderedOffset = 0;
 
         while (rem.length > budget) {
-            const split = splitForcedPlainText(rem, budget);
+            const split = splitForcedPlainTextDetailed(rem, budget);
             if (!split) break;
+            hadForcedSplit ||= split.hadForcedSplit;
 
             const srcStart = blockRenderedOffsetToCursor(block, renderedOffset, i);
-            renderedOffset += split[0].length;
+            renderedOffset += split.parts[0].length;
             const srcEnd = blockRenderedOffsetToCursor(block, renderedOffset, i);
 
             chunkData.push({
-                content: split[0],
+                content: split.parts[0],
                 mode: 'plain-text',
                 blockStart: i,
                 blockEnd: i,
                 sourceStart: srcStart,
                 sourceEnd: srcEnd,
             });
-            rem = split[1];
+            rem = split.parts[1];
         }
         currentContent = rem;
         currentSourceStart = blockRenderedOffsetToCursor(block, renderedOffset, i);
     }
 
     flushCurrent();
-    return { chunkData, splitBlockTypes: [...splitBlockTypes] };
+    return { chunkData, splitBlockTypes: [...splitBlockTypes], hadForcedSplit };
 }
 
 // --------------- greedy packing ---------------
@@ -1410,7 +1430,7 @@ function finalizeChunks(chunkData, ir, blockOffset = 0) {
 
 // --------------- diagnostics ---------------
 
-function buildDiagnostics(request, ir, chunks, usedStrategy, usedMode, splitBlockTypes = []) {
+function buildDiagnostics(request, ir, chunks, usedStrategy, usedMode, splitBlockTypes = [], hadForcedSplit = false) {
     const plainEstimate = renderBlocks(ir.children, 'plain-text').length;
     const degradedToPlainText = usedMode === 'plain-text' &&
         request.preferredMode !== 'plain-text';
@@ -1430,6 +1450,7 @@ function buildDiagnostics(request, ir, chunks, usedStrategy, usedMode, splitBloc
         usedMode,
         hadDegradation,
         degradedToPlainText,
+        hadForcedSplit,
         splitBlockTypes,
     };
 }

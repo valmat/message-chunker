@@ -218,6 +218,7 @@ describe('replanTail — diagnostics', () => {
         assert.equal(tail.diagnostics.requestedMode, 'auto');
         assert.equal(tail.diagnostics.chunkCount, tail.chunks.length);
         assert.ok(tail.diagnostics.normalizedBlockCount >= 1);
+        assert.equal(tail.diagnostics.hadForcedSplit, false);
     });
 
     it('reports degradation when strategy escalated', () => {
@@ -230,6 +231,22 @@ describe('replanTail — diagnostics', () => {
         });
 
         assert.ok(tail.diagnostics.hadDegradation);
+    });
+
+    it('reports hadForcedSplit for replanned tail when unicode-safe split is required', () => {
+        const md = 'x'.repeat(500);
+        const original = plan(md, { transport: { safeTextBudget: 200 } });
+
+        assert.ok(original.chunks.length >= 3, `expected >= 3 chunks, got ${original.chunks.length}`);
+        assert.equal(original.diagnostics.hadForcedSplit, true);
+
+        const tail = replan(md, original, 1, {
+            nextStrategy: original.diagnostics.usedStrategy,
+            transport: { safeTextBudget: 200 },
+        });
+
+        assert.equal(tail.diagnostics.usedStrategy, original.diagnostics.usedStrategy);
+        assert.equal(tail.diagnostics.hadForcedSplit, true);
     });
 });
 

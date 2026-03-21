@@ -112,6 +112,7 @@
  * @property {RenderMode} usedMode
  * @property {boolean} hadDegradation
  * @property {boolean} degradedToPlainText
+ * @property {boolean} hadForcedSplit
  * @property {string[]} splitBlockTypes
  */
 

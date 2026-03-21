@@ -71,7 +71,7 @@
   Связанные материалы:
   [docs/internal/ISSUES/issue-01-rich-html-soft-split-mid-word.md](docs/internal/ISSUES/issue-01-rich-html-soft-split-mid-word.md#L117)
 
-- [ ] Добавить `hadForcedSplit` в diagnostics и довести реализацию до нового RFC-контракта
+- [x] Добавить `hadForcedSplit` в diagnostics и довести реализацию до нового RFC-контракта
   Суть:
   После уточнения RFC diagnostics должны минимально сигнализировать, использовался ли в итоговом плане хотя бы один forced Unicode-safe split.
 

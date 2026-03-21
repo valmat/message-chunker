@@ -413,6 +413,7 @@ describe('planner — diagnostics', () => {
         assert.equal(d.usedMode, 'plain-text');
         assert.equal(d.degradedToPlainText, true);
         assert.equal(d.hadDegradation, true);
+        assert.equal(d.hadForcedSplit, false);
         assert.deepEqual(d.splitBlockTypes, []);
     });
 
@@ -430,6 +431,7 @@ describe('planner — diagnostics', () => {
         assert.equal(d.usedMode, 'rich-html');
         assert.equal(d.degradedToPlainText, false);
         assert.equal(d.hadDegradation, false);
+        assert.equal(d.hadForcedSplit, false);
     });
 
     it('forced-plain-text requested from rich preference reports mode degradation explicitly', () => {
@@ -447,6 +449,7 @@ describe('planner — diagnostics', () => {
         assert.equal(d.usedMode, 'plain-text');
         assert.equal(d.degradedToPlainText, true);
         assert.equal(d.hadDegradation, true);
+        assert.equal(d.hadForcedSplit, true);
         assert.deepEqual(d.splitBlockTypes, ['paragraph']);
     });
 
@@ -463,6 +466,7 @@ describe('planner — diagnostics', () => {
         assert.equal(d.usedMode, 'rich-html');
         assert.equal(d.hadDegradation, false);
         assert.equal(d.degradedToPlainText, false);
+        assert.equal(d.hadForcedSplit, false);
         assert.deepEqual(d.splitBlockTypes, []);
     });
 
@@ -490,6 +494,24 @@ describe('planner — diagnostics', () => {
             result.diagnostics.usedStrategy === 'plain-text') {
             assert.ok(result.diagnostics.splitBlockTypes.includes('paragraph'));
         }
+    });
+
+    it('reports hadForcedSplit when unicode-safe split was required', () => {
+        const result = plan('x'.repeat(500), {
+            transport: { safeTextBudget: 200 },
+        });
+
+        assert.equal(result.diagnostics.hadForcedSplit, true);
+    });
+
+    it('reports hadForcedSplit false when only soft boundaries were used', () => {
+        const md = 'Sentence here. '.repeat(40);
+        const result = plan(md, {
+            transport: { safeTextBudget: 200 },
+        });
+
+        assert.equal(result.diagnostics.usedStrategy, 'split-blocks-soft');
+        assert.equal(result.diagnostics.hadForcedSplit, false);
     });
 
     it('reports degradation for unsupported raw HTML lowered to text', () => {
