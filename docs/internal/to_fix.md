@@ -23,6 +23,11 @@
   RFC уже задаёт нормативное поведение:
   [docs/rfc.md](docs/rfc.md#L620) требует искать максимальный допустимый префикс и предпочитать более мягкие границы.
   [docs/rfc.md](docs/rfc.md#L648) задаёт приоритеты для paragraph: sentence end -> `;` -> `,` -> whitespace -> forced Unicode-safe split.
+  После уточнения RFC отдельно зафиксировано, что forced split допустим только если внутри maximal fitting prefix нет более мягкой допустимой границы.
+
+  Статус spec vs implementation:
+  Spec-gap по этому кейсу закрыт.
+  Дальше это implementation bug и missing regression coverage.
 
   Вероятный root cause:
   В [src/planner.js](src/planner.js#L423) функция `splitTextNode()` для `mode === 'rich-html'`:
@@ -40,6 +45,11 @@
   1. найти максимальное source-text окно, которое влезает по rendered rich-html длине;
   2. внутри этого окна выбрать лучшую читаемую границу справа налево;
   3. forced Unicode-safe split использовать только если readable boundary в этом окне реально нет.
+
+  Что нужно имплементировать:
+  1. Исправить `rich-html` path в `splitTextNode()`, чтобы paragraph boundary search действительно мог выбрать более раннюю мягкую границу внутри fitting prefix.
+  2. Убрать ложный fallback в forced split, если внутри fitting prefix есть `sentence end`, `;`, `,` или `whitespace`.
+  3. Проверить, что исправление не меняет принятый в RFC maximal-packing подход, а только убирает преждевременный forced split.
 
   Ограничения на фикс:
   Не привязывать решение к Telegram или другому транспорту.

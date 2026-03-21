@@ -622,11 +622,18 @@ We use greedy packing:
 If a chunk needs to be split, the planner:
 
 - searches for the longest prefix that does not exceed the budget;
-- prefers softer boundaries;
+- chooses the split point inside that maximal allowed prefix according to the split rules of the current block type;
+- prefers softer boundaries within that maximal allowed prefix;
 - does not split text “in half for symmetry”;
 - does not make 1800 + 1800 if we can make 3490 + 110.
 
 In other words: the split is not “about the middle”, but by the rule of the maximal allowed prefix.
+
+Normative clarification for v1:
+
+- the maximal allowed prefix is determined first;
+- after that the split point is chosen only inside this prefix;
+- a forced Unicode-safe split is allowed only if, inside this maximal allowed prefix, there is no softer allowed boundary for the current split rule.
 
 When checking the budget the normative length is the length of the final content after render and escape:
 
@@ -664,6 +671,13 @@ Note: “end of sentence” in v1 may be detected heuristically by characters .,
 For v1 a simple punctuation-based heuristic at regex level is allowed, without NLP and without complex language analysis. The implementation is not required to try to detect abbreviations, numbers, domains, URLs and other special cases.
 
 If there are several allowed boundaries of the same priority, we choose the rightmost boundary that does not exceed the budget.
+
+Normative clarification for v1:
+
+- paragraph split first determines the maximal allowed prefix that fits the budget after the final render and escape for the current mode;
+- then the planner applies the boundary priority list only inside that prefix;
+- if at least one of sentence end / `;` / `,` / whitespace exists inside that prefix, the planner must choose one of those boundaries and must not fall through to forced split;
+- forced Unicode-safe split is allowed only when no softer paragraph boundary exists inside that prefix.
 
 ### 14.2. List / List item
 
