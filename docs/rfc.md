@@ -866,6 +866,7 @@ interface PlanDiagnostics {
   usedMode: RenderMode;
   hadDegradation: boolean;
   degradedToPlainText: boolean;
+  hadForcedSplit: boolean;
   splitBlockTypes: string[];
 }
 ```
@@ -1042,6 +1043,7 @@ The module must return diagnostics suitable for:
 - actually used mode;
 - fact of degradation;
 - fact of switch to plain text;
+- fact that at least one forced Unicode-safe split was used;
 - block types that we had to split.
 
 Diagnostics must not be a mandatory part of the transport business logic, but must be available for logging and tests.
@@ -1051,6 +1053,12 @@ For v1 diagnostics are intentionally minimalistic. They are primarily an observa
 If an unsupported block / markdown was lowered to a plain-text representation, or a continuation fragment of list_item had to be simplified to a paragraph, this must be reflected at least by hadDegradation = true and by the proper entries in splitBlockTypes where applicable.
 
 For v1 this minimal signal is sufficient. The implementation is not required to provide a more detailed taxonomy of degradation causes for unsupported markdown.
+
+For v1 split diagnostics also stay intentionally minimalistic:
+
+- `hadForcedSplit = true` means that at least one actual chunk boundary in the final plan was produced by forced Unicode-safe split;
+- `hadForcedSplit = false` means that all actual chunk boundaries in the final plan were produced by softer split rules;
+- the implementation is not required in v1 to expose per-chunk split reasons, per-boundary event logs, or a separate `hadMidWordSplit` flag.
 
 Do not include into splitBlockTypes the constructs that were just degraded without an actual split. For example, unsupported markdown and raw HTML must not get there only because they were lowered or escaped.
 

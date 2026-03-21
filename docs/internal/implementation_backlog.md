@@ -1,6 +1,6 @@
-# To Fix
+# Implementation Backlog
 
-Цель файла: фиксировать только явные баги реализации, чтобы к ним можно было быстро вернуться без повторного расследования.
+Цель файла: фиксировать конкретные задачи на реализацию, которые уже вытекают либо из подтверждённых багов кода, либо из принятых уточнений RFC.
 
 Ограничения, которые надо сохранять при любых исправлениях:
 
@@ -9,7 +9,7 @@
 - исправления должны быть проверяемы обычными unit/integration tests без SDK транспорта и без network;
 - не размывать RFC v1 ради локального workaround, если проблема уже покрыта спецификацией.
 
-## Open Bugs
+## Open Tasks
 
 - [ ] `rich-html` soft split режет абзац посередине слова, хотя внутри fitting window есть более мягкая граница
   Суть:
@@ -70,3 +70,39 @@
 
   Связанные материалы:
   [docs/internal/ISSUES/issue-01-rich-html-soft-split-mid-word.md](docs/internal/ISSUES/issue-01-rich-html-soft-split-mid-word.md#L117)
+
+- [ ] Добавить `hadForcedSplit` в diagnostics и довести реализацию до нового RFC-контракта
+  Суть:
+  После уточнения RFC diagnostics должны минимально сигнализировать, использовался ли в итоговом плане хотя бы один forced Unicode-safe split.
+
+  Почему это не просто follow-up идея:
+  Это уже принятое уточнение RFC, а значит код и тесты должны быть синхронизированы с новым контрактом.
+  Нормативные места:
+  [docs/rfc.md](docs/rfc.md#L844)
+  [docs/rfc.md](docs/rfc.md#L1019)
+
+  Что нужно имплементировать:
+  1. Расширить runtime shape `PlanDiagnostics` полем `hadForcedSplit`.
+  2. Научить planner выставлять `hadForcedSplit = true`, если хотя бы одна фактическая граница чанка в финальном плане была получена forced Unicode-safe split.
+  3. Убедиться, что семантика одинакова для `planDelivery()` и `replanTail()`.
+  4. Не вводить при этом per-chunk split reasons, `hadMidWordSplit` и другие более тяжёлые diagnostics, которые мы сознательно не приняли в RFC.
+
+  Где смотреть в коде:
+  Типы diagnostics:
+  [src/types.js](src/types.js#L103)
+  Сборка diagnostics:
+  [src/planner.js](src/planner.js#L1420)
+  Текущее plain-text / forced split logic:
+  [src/splitter.js](src/splitter.js#L1)
+  [src/planner.js](src/planner.js#L423)
+
+  Что с тестами сейчас:
+  Есть tests на boundary selection и forced split как таковой, но нет явной проверки поля `hadForcedSplit` в публичных diagnostics:
+  [test/splitter.test.js](test/splitter.test.js#L1)
+  [test/planner.test.js](test/planner.test.js#L305)
+  [test/replan.test.js](test/replan.test.js#L206)
+
+  Что надо дописать:
+  1. Test для `planDelivery()`, где forced split действительно случается и `diagnostics.hadForcedSplit === true`.
+  2. Test для `planDelivery()`, где используются только мягкие границы и `diagnostics.hadForcedSplit === false`.
+  3. Test для `replanTail()`, который подтверждает ту же семантику для replanned tail.
